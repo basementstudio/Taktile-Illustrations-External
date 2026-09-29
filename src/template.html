@@ -761,11 +761,10 @@
   // thick slab's front face is exactly the thin one's back face, so together they already are
   // one box (a cube, seen on its side); the only thing left between them is that shared face.
   // It closes like a zip: a spark runs from the middle out to both ends, sealing the seam behind
-  // it, while the block rings from the impact. The thick slab's lines seen blurred through the
-  // thin one fade out by opacity before the panes hand over to the one block.
+  // it, while the block rings from the impact.
   // Everything is a pure function of the timeline, so on leave it plays back: the seam reopens
   // and the slabs pull apart.
-  const MERGE_MS = 3200;                         // the whole move at speed 1×
+  const MERGE_MS = 1920;                         // the whole move at speed 1×
   const mergeCard = $('#card-merge');
   const M_Y = 540, M_THICK0 = 129.945, M_LA = 338, M_LB0 = 510;
   const M_T1 = D_S - D_THIN;                     // thick slab's depth at contact: together they make a cube
@@ -860,8 +859,9 @@
   let mT = 0, mV = 0, mHover = false, mPt = null;
   function renderMerge() {
     const seg = (a, b) => clamp01((mT - a) / (b - a));
-    const approach = seg(0, 0.4), fuse = seg(0.4, 1);
-    if (mT < 0.4) {
+    const M_HIT = 0.34 / 0.6;                             // contact: 34% of the old 60%
+    const approach = seg(0, M_HIT), fuse = seg(M_HIT, 1);
+    if (mT < M_HIT) {
       // the thick slab gathers speed as it grows into the thin one
       const k = Math.pow(approach, 2.4), tA = lerp(M_THICK0, M_T1, k), LB = lerp(M_LB0, M_LB1, approach);
       drawBox(mA, M_LA + (D_S + tA) / 2, M_Y, D_S, tA, 0, 1);
@@ -872,13 +872,10 @@
     }
     // impact: the block rings (stretches and settles) while the seam zips shut
     const ring = cfg.merge.impact * Math.sin(3 * Math.PI * fuse) * (1 - fuse) * (1 - fuse) * Math.exp(-1.5 * fuse);
-    // The thick slab's hidden lines, seen blurred through the thin slab, fade out by opacity
-    // first; only then do the two slabs' panes hand over to the one block, so those lines never
-    // sharpen as the blur lifts and nothing blinks out.
-    const backLines = 1 - smooth(fuse / 0.4), swap = smooth((fuse - 0.3) / 0.5);
-    const zip = seg(0.4 + 0.6 * 0.06, 0.4 + 0.6 * 0.7);
+    const swap = smooth(fuse / 0.12);                     // the two slabs hand over to the one block
+    const zip = clamp01((fuse - 0.08) / 0.72);
     const tM = D_S + ring;
-    drawBox(mA, M_LA + (D_S + M_T1) / 2, M_Y, D_S, M_T1, 0, 1 - swap, backLines);
+    drawBox(mA, M_LA + (D_S + M_T1) / 2, M_Y, D_S, M_T1, 0, 1 - swap);
     drawBox(mB, M_LB1 + ring + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1 - swap);
     // the block's lines are the two slabs' outer lines, so they are there at full strength from
     // the moment of contact; only its pane crossfades with theirs
@@ -902,10 +899,11 @@
   }
 
   // ---------- 04: scale — a window opens in the back wall, grows into a cube, becomes the cube ----------
-  // Figma 7900:6719 → 7900:6735 → 7900:6755. The small cube's front face appears, scaling up
-  // from its bottom edge, and extrudes backwards to the big cube's back wall; then the small
-  // cube grows and moves to the middle (fast, on the speed curve below) while the big one fades
-  // out. It ends exactly where it started, so the loop runs on with no seam.
+  // Figma 7900:6719 → 7900:6735 → 7900:6755. The small cube's front face (the one facing the
+  // viewer on its left) appears, scaling up from its bottom edge, and extrudes backwards; then
+  // the small cube grows and moves to the middle (fast, on the speed curve below). The big cube
+  // starts fading as the small one starts to grow and is gone before it takes its place. It
+  // ends exactly where it started, so the loop runs on with no seam.
   const SCALEUP_MS = 3600;                        // one cycle at speed 1×
   const scaleupCard = $('#card-scaleup');
   const SU_E = 346 / (2 * C30), SU_ES = 104 / (2 * C30);   // big and small cube edges (Figma 346 and 104 wide)
@@ -965,14 +963,14 @@
     const f = clamp01((suP - Math.floor(suP)) / Math.max(0.01, 1 - cfg.scaleup.hold));
     const seg = (a, b) => clamp01((f - a) / (b - a));
     const open = ease(seg(0.04, 0.26)), ext = ease(seg(0.26, 0.48)), g = seg(0.56, 0.86), grow = suEase(g);
-    const fade = 1 - smooth(g);                              // the big cube only fades once the small one starts to grow
+    const fade = 1 - smooth(g / 0.5);                        // fades from the start of the grow, gone by its middle
     const h = SU_E / 2;
     drawSU(suBig, -h, h, -h, h, -h, h, fade, fade);
     if (open <= 0.0005) { drawSU(suSmall, 0, 0, 0, 0, 0, 0, 0, 0); return; }
     const es = lerp(SU_ES, SU_E, grow), C = SU_C.map(v => lerp(v, 0, grow)), hs = es / 2;
-    const x1 = C[0] + hs, y0 = C[1] - hs, z0 = C[2] - hs;
-    // the front face scales up from its bottom edge, then extrudes backwards to the wall
-    drawSU(suSmall, x1 - Math.max(0.01, ext * es), x1, y0, y0 + open * es, z0, z0 + es, smooth(open), 1, smooth(ext * 2));
+    const x0 = C[0] - hs, y0 = C[1] - hs, z1 = C[2] + hs;
+    // the front face (its +Z side) scales up from its bottom edge, then extrudes backwards
+    drawSU(suSmall, x0, x0 + es, y0, y0 + open * es, z1 - Math.max(0.01, ext * es), z1, smooth(open), 1, smooth(ext * 2));
   }
   const suFig = e => { const r = scaleupCard.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1080, (e.clientY - r.top) / r.height * 1080]; };
   scaleupCard.addEventListener('pointerenter', e => { suHover = true; suPt = suFig(e); });
@@ -1134,7 +1132,7 @@
 
   const COLORIZE = '#99C5E1';   // hover tint of the inner edges when Colorize is on
   // Color per animation: each card's own hover colour, for its inner edges and outlines
-  const CARD_COLORS = { slices: '#463ECC', depth: '#0E9755', merge: '#2386CF', scaleup: '#99C5E1' };
+  const CARD_COLORS = { slices: '#463ECC', depth: '#C98C2D', merge: '#2386CF', scaleup: '#0E9755' };
   function applyLook() {
     const root = document.documentElement.style;
     root.setProperty('--blur', cfg.look.blur + 'px');
@@ -1235,11 +1233,11 @@
         slices: { ...lift('slices'), spinDeg: cfg.slices.spin, spinDirection: 'up' },
         depth: { stepMs: Math.round(DEPTH_STEP_MS / cfg.motion.speed), onHover: '01 → 02 → 03, then holds', onLeave: '03 → 01 directly', thickPx: cfg.depth.size, thinPx: +D_THIN.toFixed(1),
           pausePct: Math.round(cfg.depth.hold * 100), spinDeg: cfg.depth.spin, spinDirection: 'up', curve: 'smootherstep + bounce overshoot', both: 'the thick slab thins while the next one thickens, stack width stays the same' },
-        merge: { durationMs: Math.round(MERGE_MS / cfg.motion.speed), phases: { approach: '0–40%', impactAndZip: '40–100%' },
-          impactPx: cfg.merge.impact, handover: 'back slab lines seen through the blur fade out over the first 40% of the impact, then the panes crossfade (30–80%)',
+        merge: { durationMs: Math.round(MERGE_MS / cfg.motion.speed), phases: { approach: '0–57%', impactAndZip: '57–100%' },
+          impactPx: cfg.merge.impact, handover: 'panes crossfade over the first 12% of the impact',
           seam: 'zips shut from the middle out behind a spark', onLeave: 'plays back' },
         scaleup: { cycleMs: Math.round(SCALEUP_MS / cfg.motion.speed), pausePct: Math.round(cfg.scaleup.hold * 100),
-          phases: { frontFaceOpens: '4–26% (scales up from its bottom edge)', extrudesBackwards: '26–48%', growsToCentre: '56–86% while the old cube fades' },
+          phases: { frontFaceOpens: '4–26% (front-left face, scales up from its bottom edge)', extrudesBackwards: '26–48%', growsToCentre: '56–86%', oldCubeFades: '56–71% (gone before the new one lands)' },
           growCurve: { type: 'speed graph with a sharp peak (Lorentzian)', peakAt: SU_PEAK, sharpness: SU_K } },
         cardsPerRow: cfg.layout.cols,
       }, null, 2);
