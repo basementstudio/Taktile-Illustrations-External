@@ -761,9 +761,8 @@
   // thick slab's front face is exactly the thin one's back face, so together they already are
   // one box (a cube, seen on its side); the only thing left between them is that shared face.
   // It closes like a zip: a spark runs from the middle out to both ends, sealing the seam behind
-  // it, while the block rings from the impact. The two slabs' panes and the lines seen through
-  // them fade out slowly into the one block, and the sealed seam fades behind the spark instead
-  // of vanishing.
+  // it, while the block rings from the impact. The thick slab's lines seen blurred through the
+  // thin one fade out by opacity before the panes hand over to the one block.
   // Everything is a pure function of the timeline, so on leave it plays back: the seam reopens
   // and the slabs pull apart.
   const MERGE_MS = 3200;                         // the whole move at speed 1×
@@ -845,17 +844,16 @@
     mS.svg.style.opacity = o.toFixed(3);
     const V = [x, M_Y], ends = [[x + D_S / 2, M_Y - D_H], [x + D_S / 2, M_Y + D_H]], f = n => n.toFixed(2);
     // sealed | spark | line; the spark fades in at the start and burns out at the tips
-    const spark = Math.sin(Math.PI * clamp01(p)), a = Math.max(0, p - 0.5), b = Math.min(1, p + 0.05);
+    const spark = Math.sin(Math.PI * clamp01(p)), a = Math.max(0, p - 0.22), b = Math.min(1, p + 0.05);
     const LINE = 'var(--line)', SPARK = 'var(--tint, var(--accent))';
-    // sealed behind the tail, then the line fading back in toward the spark (a soft trail, not a cut)
-    const stops = [[0, LINE, p > 0 ? 0 : 1], [a, LINE, p > 0 ? 0 : 1], [p, SPARK, p > 0 ? Math.max(spark, 0.35) : 1], [b, LINE, 1], [1, LINE, 1]];
+    const stops = [[0, LINE, p > 0 ? 0 : 1], [a, LINE, p > 0 ? 0 : 1], [p, SPARK, p > 0 ? spark : 1], [b, LINE, 1], [1, LINE, 1]];
     seamLines.forEach((sl, k) => {
       const d = `M${f(V[0])} ${f(V[1])}L${f(ends[k][0])} ${f(ends[k][1])}`;
       sl.line.setAttribute('d', d); sl.glow.setAttribute('d', d);
       for (const g of [sl.g, sl.gg]) { g.setAttribute('x1', f(V[0])); g.setAttribute('y1', f(V[1])); g.setAttribute('x2', f(ends[k][0])); g.setAttribute('y2', f(ends[k][1])); }
       [...sl.g.children].forEach((st, i) => { st.setAttribute('offset', stops[i][0].toFixed(3));
         st.style.stopColor = stops[i][1]; st.style.stopOpacity = stops[i][2].toFixed(3); });
-      [[Math.max(0, p - 0.12), 0], [p, spark * 0.9], [b, 0]].forEach(([off, op], i) => { const st = sl.gg.children[i];
+      [[a, 0], [p, spark * 0.9], [b, 0]].forEach(([off, op], i) => { const st = sl.gg.children[i];
         st.setAttribute('offset', off.toFixed(3)); st.style.stopColor = SPARK; st.style.stopOpacity = op.toFixed(3); });
     });
   }
@@ -874,17 +872,18 @@
     }
     // impact: the block rings (stretches and settles) while the seam zips shut
     const ring = cfg.merge.impact * Math.sin(3 * Math.PI * fuse) * (1 - fuse) * (1 - fuse) * Math.exp(-1.5 * fuse);
-    // the two slabs hand over to the one block slowly, so the lines seen through their blurred
-    // panes fade away rather than blink out
-    const swap = smooth(fuse / 0.75);
+    // The thick slab's hidden lines, seen blurred through the thin slab, fade out by opacity
+    // first; only then do the two slabs' panes hand over to the one block, so those lines never
+    // sharpen as the blur lifts and nothing blinks out.
+    const backLines = 1 - smooth(fuse / 0.4), swap = smooth((fuse - 0.3) / 0.5);
     const zip = seg(0.4 + 0.6 * 0.06, 0.4 + 0.6 * 0.7);
     const tM = D_S + ring;
-    drawBox(mA, M_LA + (D_S + M_T1) / 2, M_Y, D_S, M_T1, 0, 1 - swap);
+    drawBox(mA, M_LA + (D_S + M_T1) / 2, M_Y, D_S, M_T1, 0, 1 - swap, backLines);
     drawBox(mB, M_LB1 + ring + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1 - swap);
     // the block's lines are the two slabs' outer lines, so they are there at full strength from
     // the moment of contact; only its pane crossfades with theirs
     drawBox(mM, M_LA + (D_S + tM) / 2, M_Y, D_S, tM, 0, swap, 1);
-    drawSeam(M_LB1, smooth(zip), 1 - smooth(seg(0.4 + 0.6 * 0.55, 1)));   // what is left of it fades out slowly
+    drawSeam(M_LB1, smooth(zip), 1 - smooth(zip * 6 - 5));   // gone once sealed
   }
   const mergeFig = e => { const r = mergeCard.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1080, (e.clientY - r.top) / r.height * 1080]; };
   mergeCard.addEventListener('pointerenter', e => { mHover = true; mPt = mergeFig(e); });
@@ -903,9 +902,9 @@
   }
 
   // ---------- 04: scale — a window opens in the back wall, grows into a cube, becomes the cube ----------
-  // Figma 7900:6719 → 7900:6735 → 7900:6755. A small square window appears on the big cube's
-  // back-left wall, scaling up from its bottom edge; it extrudes into a small cube (the big one
-  // dims behind it); then the small cube grows and moves to the middle while the big one fades
+  // Figma 7900:6719 → 7900:6735 → 7900:6755. The small cube's front face appears, scaling up
+  // from its bottom edge, and extrudes backwards to the big cube's back wall; then the small
+  // cube grows and moves to the middle (fast, on the speed curve below) while the big one fades
   // out. It ends exactly where it started, so the loop runs on with no seam.
   const SCALEUP_MS = 3600;                        // one cycle at speed 1×
   const scaleupCard = $('#card-scaleup');
@@ -913,6 +912,11 @@
   // the small cube's centre, sitting on the back wall (X = -SU_E / 2); on screen it is at (429, 490)
   const SU_C = [-SU_E / 2 + SU_ES / 2, 44.22, 58.31];
   const suProj = ([X, Y, Z]) => [540 + (X - Z) * C30, 540 + (X + Z) / 2 - Y];
+  // the scale-up's speed graph: a sharp peak a little before the middle, near zero at both ends
+  // (a Lorentzian speed curve, so its position is an arctan)
+  const SU_PEAK = 0.42, SU_K = 18;
+  const suEase = t => { const A = Math.atan(-SU_K * SU_PEAK), B = Math.atan(SU_K * (1 - SU_PEAK));
+    return (Math.atan(SU_K * (clamp01(t) - SU_PEAK)) - A) / (B - A); };
   function suLayer(id) {
     const layer = document.createElement('div');
     layer.className = 'layer';
@@ -960,16 +964,15 @@
     // Pause: the share of the cycle held at the end before the next one
     const f = clamp01((suP - Math.floor(suP)) / Math.max(0.01, 1 - cfg.scaleup.hold));
     const seg = (a, b) => clamp01((f - a) / (b - a));
-    const open = ease(seg(0.04, 0.26)), ext = ease(seg(0.26, 0.48)), grow = ease(seg(0.56, 1));
-    const dim = lerp(1, 0.22, smooth(seg(0.04, 0.3)));       // the big cube's lines dim as the window opens
-    const fade = 1 - smooth(seg(0.56, 0.92));                // and it fades out while the small one takes over
+    const open = ease(seg(0.04, 0.26)), ext = ease(seg(0.26, 0.48)), g = seg(0.56, 0.86), grow = suEase(g);
+    const fade = 1 - smooth(g);                              // the big cube only fades once the small one starts to grow
     const h = SU_E / 2;
-    drawSU(suBig, -h, h, -h, h, -h, h, fade, dim * fade);
+    drawSU(suBig, -h, h, -h, h, -h, h, fade, fade);
     if (open <= 0.0005) { drawSU(suSmall, 0, 0, 0, 0, 0, 0, 0, 0); return; }
     const es = lerp(SU_ES, SU_E, grow), C = SU_C.map(v => lerp(v, 0, grow)), hs = es / 2;
-    const x0 = C[0] - hs, y0 = C[1] - hs, z0 = C[2] - hs;
-    // the window scales up from its bottom edge, then extrudes out of the wall
-    drawSU(suSmall, x0, x0 + Math.max(0.01, ext * es), y0, y0 + open * es, z0, z0 + es, smooth(open), 1, smooth(ext * 2));
+    const x1 = C[0] + hs, y0 = C[1] - hs, z0 = C[2] - hs;
+    // the front face scales up from its bottom edge, then extrudes backwards to the wall
+    drawSU(suSmall, x1 - Math.max(0.01, ext * es), x1, y0, y0 + open * es, z0, z0 + es, smooth(open), 1, smooth(ext * 2));
   }
   const suFig = e => { const r = scaleupCard.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1080, (e.clientY - r.top) / r.height * 1080]; };
   scaleupCard.addEventListener('pointerenter', e => { suHover = true; suPt = suFig(e); });
@@ -1233,10 +1236,11 @@
         depth: { stepMs: Math.round(DEPTH_STEP_MS / cfg.motion.speed), onHover: '01 → 02 → 03, then holds', onLeave: '03 → 01 directly', thickPx: cfg.depth.size, thinPx: +D_THIN.toFixed(1),
           pausePct: Math.round(cfg.depth.hold * 100), spinDeg: cfg.depth.spin, spinDirection: 'up', curve: 'smootherstep + bounce overshoot', both: 'the thick slab thins while the next one thickens, stack width stays the same' },
         merge: { durationMs: Math.round(MERGE_MS / cfg.motion.speed), phases: { approach: '0–40%', impactAndZip: '40–100%' },
-          impactPx: cfg.merge.impact, handover: 'panes and the lines seen through them crossfade over 75% of the impact',
-          seam: 'zips shut from the middle out behind a spark, with a soft trail; what is left fades out', onLeave: 'plays back' },
+          impactPx: cfg.merge.impact, handover: 'back slab lines seen through the blur fade out over the first 40% of the impact, then the panes crossfade (30–80%)',
+          seam: 'zips shut from the middle out behind a spark', onLeave: 'plays back' },
         scaleup: { cycleMs: Math.round(SCALEUP_MS / cfg.motion.speed), pausePct: Math.round(cfg.scaleup.hold * 100),
-          phases: { windowOpens: '4–26% (scales up from its bottom edge)', extrudes: '26–48%', growsToCentre: '56–100% while the old cube fades' } },
+          phases: { frontFaceOpens: '4–26% (scales up from its bottom edge)', extrudesBackwards: '26–48%', growsToCentre: '56–86% while the old cube fades' },
+          growCurve: { type: 'speed graph with a sharp peak (Lorentzian)', peakAt: SU_PEAK, sharpness: SU_K } },
         cardsPerRow: cfg.layout.cols,
       }, null, 2);
       try { await navigator.clipboard.writeText(txt); $('#toast').textContent = 'Copied to clipboard.'; }
