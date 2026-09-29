@@ -320,7 +320,7 @@
     slices: { strength: 14, influence: 0.45, spin: 90 },
     depth:  { size: 130, hold: 0.3, spin: 90 },
     merge:  { impact: 18 },
-    scaleup: { hold: 0.2, rotate: false },
+    scaleup: { hold: 0.2, straight: false },
     layout: { cols: 2 },
     versions: { slices: 1, depth: 1, merge: 1, scaleup: 1 },
     preview: false,
@@ -988,13 +988,14 @@
   const SU_E = 346 / (2 * C30), SU_ES = 104 / (2 * C30);   // big and small cube edges (Figma 346 and 104 wide)
   // the small cube's centre, sitting on the back wall (X = -SU_E / 2); on screen it is at (429, 490)
   const SU_C = [-SU_E / 2 + SU_ES / 2, 44.22, 58.31];
-  // Rotate (04 and its v2): the whole drawing turned 30° counter-clockwise about the frame's centre
-  // is the cube lying on its side of Figma 7907:5126, with the window on its lower-left face. It
+  // 04 and its v2 lie on their side by default: the whole drawing turned 30° counter-clockwise
+  // about the frame's centre is the cube of Figma 7907:5126, window on its lower-left face; the
+  // Straight toggle stands it upright. It
   // is done in the geometry (not a CSS rotation), so lines stay crisp and hit tests just work.
   const SU_ROT = -30 * Math.PI / 180, SU_RC = Math.cos(SU_ROT), SU_RS = Math.sin(SU_ROT);
   const suProj = ([X, Y, Z]) => {
     const x = (X - Z) * C30, y = (X + Z) / 2 - Y;
-    return cfg.scaleup.rotate ? [540 + x * SU_RC - y * SU_RS, 540 + x * SU_RS + y * SU_RC] : [540 + x, 540 + y];
+    return !cfg.scaleup.straight ? [540 + x * SU_RC - y * SU_RS, 540 + x * SU_RS + y * SU_RC] : [540 + x, 540 + y];
   };
   // the scale-up's speed graph: a sharp peak a little before the middle, near zero at both ends
   // (a Lorentzian speed curve, so its position is an arctan)
@@ -1567,9 +1568,9 @@
       { k: 'hold', label: 'Pause', min: 0, max: 0.7, step: 0.01, fmt: pct }, SPIN] },
     merge:  { note: 'Two slabs collide and fuse into one cube; the seam between them zips shut behind a spark. On leave it plays back. Impact: how hard the block rings when they hit.', fields: [
       { k: 'impact', label: 'Impact', min: 0, max: 60, step: 1, fmt: px }] },
-    scaleup: { note: 'A window opens in the back wall, extrudes into a small cube, and grows into the new cube while the old one fades. Pause: how long it holds at the end of each cycle. Rotate turns the cube onto its side (as in Figma 7907:5126) for this version and the first alternative.', fields: [
+    scaleup: { note: 'A window opens in the back wall, extrudes into a small cube, and grows into the new cube while the old one fades. Pause: how long it holds at the end of each cycle. The cube lies on its side (as in Figma 7907:5126) in this version and the first alternative; Straight stands it upright.', fields: [
       { k: 'hold', label: 'Pause', min: 0, max: 0.6, step: 0.01, fmt: pct },
-      { k: 'rotate', type: 'check', label: 'Rotate cube (on its side)' }] },
+      { k: 'straight', type: 'check', label: 'Straight cube (upright)' }] },
   };
 
   const COLORIZE = '#99C5E1';   // hover tint of the inner edges when Colorize is on
