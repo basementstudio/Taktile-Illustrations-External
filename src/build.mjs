@@ -34,21 +34,9 @@ function extract(file, prefix) {
   return all;
 }
 
-let i1 = extract('i1.svg', 'cubes');
-i1 = i1.replace(/<path id="cubes-vector-5874"[^>]*\/>\s*/, ''); // stray 8px mark in the frame
-const i2 = extract('i2.svg', 'stack');
-const i4 = extract('i4.svg', 'hole');
-const i5 = extract('i5.svg', 'slices');
-let i6 = extract('i6.svg', 'orbit');
-// the dashed connectors are loose paths in the frame; give each its own group so it
-// becomes a layer the hover can tint
-i6 = i6.replace(/(<path id="orbit-vector-(\d+)"[^>]*stroke-dasharray[^>]*\/>)/g, '<g id="orbit-conn-$2">$1</g>');
-
-// 07 (Figma node 7732:27118), rebuilt from the frame's geometry with the outlines already as strokes
-const i7 = extract('i7.svg', 'grow');
+const i5 = extract('i5.svg', 'slices');   // 01 · Slices (the other cards are drawn procedurally)
 
 let html = fs.readFileSync(path.join(dir, 'template.html'), 'utf8');
-html = html.replace('{{CUBES}}', i1).replace('{{STACK}}', i2).replace('{{HOLE}}', i4).replace('{{SLICES}}', i5)
-  .replace('{{ORBIT}}', i6).replace('{{GROW}}', i7);
+html = html.replace('{{SLICES}}', i5);
 fs.writeFileSync(out, html);
 console.log('wrote', out, html.length, 'bytes');

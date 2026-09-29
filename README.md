@@ -4,9 +4,19 @@ Hover-animation prototypes for Taktile's isometric illustrations (external versi
 
 Published preview: https://claude.ai/artifact/Uuheq1CujWzzWozDJxCH86
 
-- The side panel only holds what every animation shares: Motion, BG Blur, Preview.
+Four animations:
+
+1. **Slices slide right** (from the Figma export in `src/i5.svg`)
+2. **Depth hand-off**: the thick slab hands its depth along on hover and hands it back on leave
+3. **Connect**: two slabs collide and fuse into one cube; the seam zips shut behind a spark
+4. **Scale** (loop): a window in the back wall extrudes into a small cube that grows into the new cube
+
+Cards 2–4 are drawn procedurally from the Figma frames' geometry.
+
+- The side panel only holds what every animation shares: Motion, BG Blur, colour options, Follow pointer, Preview.
+- **Color per animation** gives each card its own hover colour: 01 #463ECC, 02 #0E9755, 03 #2386CF, 04 #99C5E1.
 - Each card's own settings live in a collapsed **Customize parameters** dropdown inside that card.
-- Loops (03, 05) always return to rest when the pointer leaves.
+- Loops always return to rest when the pointer leaves.
 
 ## Font
 
@@ -18,7 +28,7 @@ The page is set in Söhne (Klim Type Foundry), a licensed font that isn't bundle
 - `index.html` — the built page (published as the artifact). Don't edit by hand.
 - `src/template.html` — page source: styles, markup and all animation code.
 - `src/build.mjs` — injects the Figma SVG exports into the template and writes `index.html`.
-- `src/i*.svg` — raw SVG exports of the Figma frames. `i7.svg` (07, Figma node 7732:27118) is rebuilt from that frame's geometry, with the outlines already as plain strokes.
+- `src/i5.svg` — raw SVG export of the Figma frame for 01.
 - `serve.mjs` — local preview server (wraps the page the way the artifact host does).
 
 ## Build and preview
