@@ -32,6 +32,7 @@ All alternative versions move on the same sharp-peak speed curve. In 01 and 02 t
 - **Color per animation** gives each card its own hover colour: 01 #463ECC, 02 #C98C2D, 03 #2386CF, 04 #0E9755.
 - Each card's own settings live in a collapsed **Customize parameters** dropdown inside that card.
 - Loops always return to rest when the pointer leaves.
+- 04's **Rotate cube** toggle (Customize parameters) lays the cube on its side, as in Figma 7907:5126, for 04 and its first alternative; the animations stay the same.
 
 ## Font
 
