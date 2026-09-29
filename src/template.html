@@ -259,7 +259,7 @@
     merge:  { impact: 18 },
     scaleup: { hold: 0.2 },
     layout: { cols: 2 },
-    versions: { slices: 1, depth: 1, merge: 1 },
+    versions: { slices: 1, depth: 1, merge: 1, scaleup: 1 },
     preview: false,
   };
   const KEY = 'taktile-motion-external-v2';
@@ -1025,7 +1025,7 @@
     const slabs = [...Array(n + 1)].map((_, i) => v2Layer(card, id + i));
     const st = { P: 0, vel: 0, ret: null, hover: false, pt: null };
     const render = () => {
-      const k = Math.floor(st.P), e = ease(clamp01((st.P - k) / 0.7));   // move, then a short pause
+      const k = Math.floor(st.P), e = suEase(clamp01((st.P - k) / 0.7));   // move (03 v2's speed curve), then a short pause
       slabs.forEach((c, i) => {
         const base = ((i + k) % (n + 1) + n + 1) % (n + 1);               // 0: waiting to enter
         const sl = base - 1 + e, lo = Math.min(n - 1, Math.floor(sl)), fr = sl - lo;
@@ -1057,16 +1057,19 @@
     };
     return { render, step, st };
   }
+  // the slab leaving on the right and the one arriving on the left travel this far past the end
+  // slots, and are this thin out there (they narrow as they go, widen as they come)
+  const V2_FAR = 260, V2_EDGE_T = 4;
   // 01 v2: four slabs as in the Figma frame; the one in the third slot is always the thick one,
   // so each slab thickens as it moves into that slot and thins as it moves on
   const SL_THIN = 29.42, SL_THICK = 129.42, SL_L = [271.58, 381.1, 431.11, 580.53];
   const slicesV2 = makeConveyor($('#card-slices'), 'slV2',
-    [SL_L[0] - 109.5, ...SL_L, SL_L[3] + 109.5], [SL_THIN, SL_THIN, SL_THIN, SL_THICK, SL_THIN, SL_THIN], 540, 1400);
-  // 02 v2: three slabs as in its v1; the first slot is always the thick one: the new slab comes
-  // in thick, and each one thins as it moves on
+    [SL_L[0] - V2_FAR, ...SL_L, SL_L[3] + V2_FAR], [V2_EDGE_T, SL_THIN, SL_THIN, SL_THICK, SL_THIN, V2_EDGE_T], 540, 1400);
+  // 02 v2: three slabs as in its v1; the first slot is always the thick one: the new slab
+  // widens into it as it arrives, and each one thins as it moves on
   const DV_L = [D_LEFT, D_LEFT + D_GAPS[0] + (D_FIG_THICK - D_THIN), D_LEFT + D_GAPS[0] + (D_FIG_THICK - D_THIN) + D_GAPS[1]];
   const depthV2 = makeConveyor($('#card-depth'), 'dpV2',
-    [D_LEFT - D_GAPS[0] - (D_FIG_THICK - D_THIN), ...DV_L, DV_L[2] + D_GAPS[1]], [D_FIG_THICK, D_FIG_THICK, D_THIN, D_THIN, D_THIN], D_Y, 1400);
+    [D_LEFT - V2_FAR, ...DV_L, DV_L[2] + V2_FAR], [V2_EDGE_T, D_FIG_THICK, D_THIN, D_THIN, V2_EDGE_T], D_Y, 1400);
   // 03 v2: the same collision and seal as v1, faster and on 04's speed curve; then the block
   // thins back into the thin slab while a new thick slab fades in from the left, and it loops
   const MV2_MS = 2600;
@@ -1118,8 +1121,49 @@
     }
     stepPartTint(mvParts, mvSt.pt, dt);
   }
+  // 04 v2: the window scales up and extrudes at the same time, taking the big cube's shape, while
+  // the big cube flattens (its front face recedes to the back) to make room and fades out; then a
+  // new window opens on the new cube, as in v1, which is the resting frame again
+  const SU2_MS = 3000;
+  const su2 = { B: suLayer('su2B'), W: suLayer('su2W'), N: suLayer('su2N') };
+  for (const c of Object.values(su2)) c.layer.classList.add('v2');
+  su2.B.layer.style.zIndex = 1; su2.W.layer.style.zIndex = 2; su2.N.layer.style.zIndex = 3;
+  const su2St = { P: 0, vel: 0, ret: null, hover: false, pt: null };
+  function renderScaleUpV2() {
+    const f = su2St.P - Math.floor(su2St.P), seg = (a, b) => clamp01((f - a) / (b - a)), h = SU_E / 2;
+    const g = suEase(seg(0.04, 0.62)), open = ease(seg(0.72, 0.94));
+    // the big cube: its depth shrinks toward the back while it fades
+    const zFront = lerp(h, -h, g);
+    drawSU(su2.B, -h, h, -h, h, -h, Math.max(-h + 0.01, zFront), 1 - smooth(seg(0.04, 0.5)), 1 - smooth(seg(0.04, 0.5)));
+    // the window: grows from the small front face into the whole cube, scaling and extruding at once
+    const es = lerp(SU_ES, SU_E, g), C = SU_C.map(v => lerp(v, 0, g)), hs = es / 2, z1 = C[2] + hs;
+    drawSU(su2.W, C[0] - hs, C[0] + hs, C[1] - hs, C[1] + hs, z1 - Math.max(0.01, g * es), z1, 1, 1, smooth(g * 2));
+    // a new window opens on the new cube, from its bottom edge
+    if (open <= 0.0005) drawSU(su2.N, 0, 0, 0, 0, 0, 0, 0, 0);
+    else { const x0 = SU_C[0] - SU_ES / 2, y0 = SU_C[1] - SU_ES / 2, zz = SU_C[2] + SU_ES / 2;
+      drawSU(su2.N, x0, x0 + SU_ES, y0, y0 + open * SU_ES, zz - 0.01, zz, smooth(open), 1, 0); }
+  }
+  scaleupCard.addEventListener('pointerenter', e => { su2St.hover = true; su2St.pt = suFig(e); });
+  scaleupCard.addEventListener('pointermove', e => { su2St.pt = suFig(e); });
+  scaleupCard.addEventListener('pointerleave', () => { su2St.hover = false; su2St.pt = null; });
+  const su2Parts = [su2.N, su2.W, su2.B].map(c => ({ layers: [c.layer], tint: c.stops, over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  function stepScaleUpV2(dt) {
+    const full = cfg.motion.speed / SU2_MS, on = su2St.hover || cfg.preview;
+    if (!on && (su2St.ret || su2St.vel > 0 || su2St.P % 1 !== 0)) {
+      // Return to rest: finish the cycle (it ends on its starting frame)
+      if (!su2St.ret) su2St.ret = startGlide(su2St.P, su2St.vel * full, full);
+      su2St.vel = ramp(su2St.vel, false, dt);
+      if (!su2St.ret.done) { glide(su2St.ret, dt); su2St.P = su2St.ret.x; renderScaleUpV2(); }
+      if (su2St.ret.done) { su2St.P = ((su2St.P % 1) + 1) % 1; renderScaleUpV2(); if (su2St.vel === 0) su2St.ret = null; }
+    } else {
+      if (su2St.ret) { su2St.ret = null; su2St.P = ((su2St.P % 1) + 1) % 1; }
+      su2St.vel = ramp(su2St.vel, on, dt);
+      if (su2St.vel > 0) { su2St.P = (su2St.P + dt * su2St.vel * full) % 1; renderScaleUpV2(); }
+    }
+    stepPartTint(su2Parts, su2St.pt, dt);
+  }
   // version switch: an arrow on each side of the card; the title says when it shows the v2
-  const VERSIONED = ['slices', 'depth', 'merge'];
+  const VERSIONED = ['slices', 'depth', 'merge', 'scaleup'];
   const ARROW = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
   for (const key of VERSIONED) {
     const card = $('#card-' + key), tag = card.querySelector('.tag');
@@ -1217,7 +1261,7 @@
     stepScaleUp(dt);
     stepDepth(dt);
     stepMerge(dt);
-    slicesV2.step(dt); depthV2.step(dt); stepMergeV2(dt);
+    slicesV2.step(dt); depthV2.step(dt); stepMergeV2(dt); stepScaleUpV2(dt);
     stepFollow(dt);
     requestAnimationFrame(tick);
   }
@@ -1295,7 +1339,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderDepth(); renderMerge(); renderScaleUp(); slicesV2.render(); depthV2.render(); renderMergeV2(); applyVersions(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderDepth(); renderMerge(); renderScaleUp(); slicesV2.render(); depthV2.render(); renderMergeV2(); renderScaleUpV2(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
   function fieldRow(f, obj, id) {
@@ -1419,8 +1463,10 @@
   requestAnimationFrame(tick);
   // console handle for scrubbing the loop: __motion.seek(0..1)
   window.__motion = { seekScaleUp: v => { suP = v; renderScaleUp(); },
-    seekV2: (key, v) => { const st = key === 'merge' ? mvSt : (key === 'slices' ? slicesV2 : depthV2).st;
-      Object.assign(st, { P: v, ret: null, vel: 0 }); if (key === 'merge') renderMergeV2(); else (key === 'slices' ? slicesV2 : depthV2).render(); }, seekDepth: u => { dU = u; renderDepth(); }, seekMerge: t => { mT = t; renderMerge(); },
+    seekV2: (key, v) => {
+      const st = key === 'merge' ? mvSt : key === 'scaleup' ? su2St : (key === 'slices' ? slicesV2 : depthV2).st;
+      Object.assign(st, { P: v, ret: null, vel: 0 });
+      if (key === 'merge') renderMergeV2(); else if (key === 'scaleup') renderScaleUpV2(); else (key === 'slices' ? slicesV2 : depthV2).render(); }, seekDepth: u => { dU = u; renderDepth(); }, seekMerge: t => { mT = t; renderMerge(); },
     // pose a spinning layer at an angle (degrees): __motion.spinAt('slices-layer-3', 45)
     spinAt: (id, deg) => { for (const h of HOVER) { const sp = h.byId[id]; if (sp && sp.spin) { sp.spin.a = sp.spin.target = deg * Math.PI / 180; if (deg % 90) sp.spin.draw(sp.layer.blur); else sp.spin.restore(sp.layer.blur); } } } };
 })();

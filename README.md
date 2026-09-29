@@ -13,11 +13,14 @@ Four animations:
 
 Cards 2–4 are drawn procedurally from the Figma frames' geometry.
 
-Cards 01–03 also have an **alternative version**: the arrows on each side of the card switch to it, and its title then ends in "(Alternative version)".
+Every card also has an **alternative version**: the arrows on each side of the card switch to it, and its title then ends in "(Alternative version)".
 
 - 01: a conveyor; on hover the last slab slides out right as a new one fades in from the left, and the slab in the third slot is always the thick one
 - 02: the same conveyor with the first slot always thick
-- 03: the collision and seal, faster (04's speed curve); then the block thins back into the thin slab as a new thick one fades in from the left, and it loops
+- 03: the collision and seal, faster; then the block thins back into the thin slab as a new thick one fades in from the left, and it loops
+- 04: the window scales up and extrudes at once into the big cube, while the old cube flattens toward the back and fades; then a new window opens
+
+All alternative versions move on the same sharp-peak speed curve. In 01 and 02 the leaving and arriving slabs travel far past the end slots and narrow out there.
 
 - The side panel only holds what every animation shares: Motion, BG Blur, colour options, Follow pointer, Preview.
 - **Color per animation** gives each card its own hover colour: 01 #463ECC, 02 #C98C2D, 03 #2386CF, 04 #0E9755.
