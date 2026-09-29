@@ -22,7 +22,7 @@ Every card also has an **alternative version**: the arrows on each side of the c
 
 A second alternative (**v3**, "Alternative version 2") keeps the shapes static and plays a move only for the shape under the pointer:
 
-- 01 / 02: the hovered slab grows deeper, the others make room; leaving puts it back
+- 01 / 02: the hovered slab takes the thick depth and the thick one thins (only one thick slab at a time); leaving puts it back
 - 03: hovering the thick slab plays the collision; hovering the thin one plays it mirrored (the thin one widens left while the thick one thins); leaving plays back
 - 04: hovering the window plays v2's growth into the big cube; leaving plays back
 
