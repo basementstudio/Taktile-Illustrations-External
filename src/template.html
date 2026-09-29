@@ -1164,6 +1164,14 @@
     stepPartTint(su2Parts, su2St.pt, dt);
   }
   // ---------- v3s: static shapes; hovering a shape plays its move, leaving plays it back ----------
+  // v3 moves answer the pointer right away: no start ramp, and curves that move most at the start
+  // and settle softly (instead of gathering speed first)
+  const V3_MS = 1150;                                                       // 03 and 04 v3 moves at speed 1×
+  const easeOutV3 = t => 1 - Math.pow(1 - clamp01(t), 3);
+  const SU3_PEAK = 0.12;                                                    // 04 v3: the scale curve with its peak brought forward
+  const suEaseV3 = t => { const A = Math.atan(-SU_K * SU3_PEAK), B = Math.atan(SU_K * (1 - SU3_PEAK));
+    return (Math.atan(SU_K * (clamp01(t) - SU3_PEAK)) - A) / (B - A); };
+  const V3_SPRING = 0.55;                                                   // 01/02 v3: a quicker hover spring than the shared one
   const v3Layer = (card, id) => { const L = mergeLayer(id, true, card); L.layer.classList.add('v3'); return L; };
   const figOf = (card, e) => { const r = card.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1080, (e.clientY - r.top) / r.height * 1080]; };
   // 01 / 02 v3: the slabs stay put; the one under the pointer takes the thick depth and the thick
@@ -1190,7 +1198,7 @@
       else if (under === -1 || st.hot === -1) { st.hot = under; st.cand = under; }         // on/off a shape: at once
       else if (st.cand !== under) { st.cand = under; st.since = 0; }
       else if ((st.since += dt) >= V3_SETTLE) st.hot = under;                             // from one slab to another: once it holds
-      const w = 2 * Math.PI * cfg.motion.speed / CURVES[cfg.motion.curve].response, k = w * w, c = 2 * damping() * w;
+      const w = 2 * Math.PI * cfg.motion.speed / (CURVES[cfg.motion.curve].response * V3_SPRING), k = w * w, c = 2 * damping() * w;
       const n = Math.max(1, Math.ceil(dt / 4)), hs = dt / 1000 / n;
       let moved = !st.drawn;
       st.t.forEach((t, i) => {
@@ -1216,7 +1224,7 @@
   const m3St = { T: 0, V: 0, mode: 'A', armed: false, pt: null };
   function renderMergeV3() {
     const seg = (a, b) => clamp01((m3St.T - a) / (b - a)), HIT = 0.34 / 0.6;
-    const approach = seg(0, HIT), fuse = seg(HIT, 1), k = Math.pow(approach, 2.4), R = M_LA + 2 * D_S;   // R: the cube's right edge
+    const approach = seg(0, HIT), fuse = seg(HIT, 1), k = easeOutV3(approach), R = M_LA + 2 * D_S;   // R: the cube's right edge
     const ring = cfg.merge.impact * Math.sin(3 * Math.PI * fuse) * (1 - fuse) * (1 - fuse) * Math.exp(-1.5 * fuse);
     const swap = smooth(fuse / 0.12), zip = clamp01((fuse - 0.08) / 0.72);
     if (m3St.mode === 'A') {   // as v1
@@ -1266,22 +1274,20 @@
       else if (on(m3.A)) { m3St.mode = 'A'; m3St.armed = true; }
       else m3St.armed = false;
     } else m3St.armed = on(m3.A) || on(m3.B) || on(m3.M);
-    const target = m3St.armed || cfg.preview ? 1 : -1, r = cfg.motion.smoothing;
-    m3St.V = r <= 0 ? target : m3St.V + (target - m3St.V) * (1 - Math.exp(-dt / (r / 3)));
+    const target = m3St.armed || cfg.preview ? 1 : -1;
     const was = m3St.T;
-    m3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(m3St.T + m3St.V * dt * cfg.motion.speed / MERGE_MS);
+    m3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(m3St.T + target * dt * cfg.motion.speed / V3_MS);
     if (m3St.T !== was) renderMergeV3();
     stepPartTint(m3Parts, m3St.pt, dt);
   }
   // 04 v3: static; hovering the window plays v2's growth (it scales up and extrudes into the big
   // cube while the big one flattens away and fades) and holds; moving off it plays it back
-  const S3_MS = 1700;
   const s3 = { B: suLayer('s3B'), W: suLayer('s3W') };
   for (const c of Object.values(s3)) c.layer.classList.add('v3');
   s3.B.layer.style.zIndex = 1; s3.W.layer.style.zIndex = 2;
   const s3St = { T: 0, V: 0, armed: false, pt: null };
   function renderScaleUpV3() {
-    const g = suEase(s3St.T), h = SU_E / 2, fade = 1 - smooth(s3St.T / 0.8);
+    const g = suEaseV3(s3St.T), h = SU_E / 2, fade = 1 - smooth(s3St.T / 0.8);
     drawSU(s3.B, -h, h, -h, h, -h, Math.max(-h + 0.01, lerp(h, -h, g)), fade, fade);
     const es = lerp(SU_ES, SU_E, g), C = SU_C.map(v => lerp(v, 0, g)), hs = es / 2, z1 = C[2] + hs;
     drawSU(s3.W, C[0] - hs, C[0] + hs, C[1] - hs, C[1] + hs, z1 - Math.max(0.01, g * es), z1, 1, 1, smooth(g * 2));
@@ -1293,10 +1299,9 @@
   function stepScaleUpV3(dt) {
     // plays only while the pointer is on the window, as drawn (it grows under the pointer)
     s3St.armed = !!s3St.pt && !!s3.W.poly && inPoly(s3St.pt, s3.W.poly);
-    const target = s3St.armed || cfg.preview ? 1 : -1, r = cfg.motion.smoothing;
-    s3St.V = r <= 0 ? target : s3St.V + (target - s3St.V) * (1 - Math.exp(-dt / (r / 3)));
+    const target = s3St.armed || cfg.preview ? 1 : -1;
     const was = s3St.T;
-    s3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(s3St.T + s3St.V * dt * cfg.motion.speed / S3_MS);
+    s3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(s3St.T + target * dt * cfg.motion.speed / V3_MS);
     if (s3St.T !== was) renderScaleUpV3();
     stepPartTint(s3Parts, s3St.pt, dt);
   }
