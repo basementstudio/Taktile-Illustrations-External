@@ -208,11 +208,11 @@
       </div>
     </header>
     <div class="grid">
-      <div class="card" id="card-slices"><div class="tag">01 · Slices slide right</div>
+      <div class="card" id="card-slices"><div class="tag">01 · Decide</div>
         <svg class="src" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">{{SLICES}}</svg></div>
-      <div class="card" id="card-depth"><div class="tag">02 · Depth hand-off</div></div>
+      <div class="card" id="card-depth"><div class="tag">02 · Optimize</div></div>
       <div class="card" id="card-merge"><div class="tag">03 · Connect</div></div>
-      <div class="card" id="card-scaleup"><div class="tag">04 · Scale (loop)</div></div>
+      <div class="card" id="card-scaleup"><div class="tag">04 · Scale</div></div>
     </div>
 
   </main>
@@ -913,6 +913,7 @@
   // the scale-up's speed graph: a sharp peak a little before the middle, near zero at both ends
   // (a Lorentzian speed curve, so its position is an arctan)
   const SU_PEAK = 0.42, SU_K = 18;
+  const SU_REST = 0.26;   // the resting frame: the window fully open, not yet extruded (end of its opening)
   const suEase = t => { const A = Math.atan(-SU_K * SU_PEAK), B = Math.atan(SU_K * (1 - SU_PEAK));
     return (Math.atan(SU_K * (clamp01(t) - SU_PEAK)) - A) / (B - A); };
   function suLayer(id) {
@@ -959,8 +960,10 @@
   const suBig = suLayer('suB'), suSmall = suLayer('suS');
   let suP = 0, suVel = 0, suRet = null, suHover = false, suPt = null;
   function renderScaleUp() {
-    // Pause: the share of the cycle held at the end before the next one
-    const f = clamp01((suP - Math.floor(suP)) / Math.max(0.01, 1 - cfg.scaleup.hold));
+    // Pause: the share of the cycle held before the next one. The cycle starts (and rests) on the
+    // big cube with the window already open, so the loop position is shifted to that moment.
+    const hold = Math.max(0.01, 1 - cfg.scaleup.hold), raw = suP + SU_REST * hold;
+    const f = clamp01((raw - Math.floor(raw)) / hold);
     const seg = (a, b) => clamp01((f - a) / (b - a));
     const open = ease(seg(0.04, 0.26)), ext = ease(seg(0.26, 0.48)), g = seg(0.56, 0.86), grow = suEase(g);
     const fade = 1 - smooth(g / 0.5);                        // fades from the start of the grow, gone by its middle

@@ -6,10 +6,10 @@ Published preview: https://claude.ai/artifact/Uuheq1CujWzzWozDJxCH86
 
 Four animations:
 
-1. **Slices slide right** (from the Figma export in `src/i5.svg`)
-2. **Depth hand-off**: the thick slab hands its depth along on hover and hands it back on leave
+1. **Decide**: slices slide right (from the Figma export in `src/i5.svg`)
+2. **Optimize**: the thick slab hands its depth along on hover and hands it back on leave
 3. **Connect**: two slabs collide and fuse into one cube; the seam zips shut behind a spark
-4. **Scale** (loop): a window in the back wall extrudes into a small cube that grows into the new cube
+4. **Scale** (loop): rests on the cube with a window open; the window extrudes into a small cube that grows into the new cube, and a new window opens
 
 Cards 2–4 are drawn procedurally from the Figma frames' geometry.
 
