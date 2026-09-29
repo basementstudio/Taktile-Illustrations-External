@@ -177,6 +177,17 @@
   .tune-body .link { background: none; border: 0; padding: 0; margin: 4px 0 2px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
   .tune-body .link:hover { color: var(--text); }
 
+  /* versions: a card shows its v1 layers, or its v2 layers when data-v="2" */
+  .card[data-v="2"] > .layer:not(.v2), .card[data-v="2"] > .hits-svg { display: none; }
+  .card:not([data-v="2"]) > .layer.v2 { display: none; }
+  .ver {
+    position: absolute; top: 50%; transform: translateY(-50%); z-index: 300; display: grid; place-items: center;
+    width: 32px; height: 48px; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; transition: color .2s;
+  }
+  .ver svg { width: 16px; height: 16px; }
+  .ver:hover { color: var(--text); }
+  .ver.prev { left: 4px; } .ver.next { right: 4px; }
+
   .actions { display: flex; gap: 8px; margin-top: 28px; }
   .check { display: flex; align-items: center; gap: 8px; color: var(--muted); margin: 10px 0; cursor: pointer; }
   .toast { color: var(--muted); font-size: 12px; min-height: 18px; margin-top: 8px; }
@@ -310,11 +321,12 @@
     merge:  { impact: 18 },
     scaleup: { hold: 0.2 },
     layout: { cols: 2 },
+    versions: { slices: 1, depth: 1, merge: 1 },
     preview: false,
   };
   const KEY = 'taktile-motion-external-v2';
   const clone = o => JSON.parse(JSON.stringify(o));
-  const SAVED = ['motion', 'look', 'layout', 'slices', 'depth', 'merge', 'scaleup'];
+  const SAVED = ['motion', 'look', 'layout', 'versions', 'slices', 'depth', 'merge', 'scaleup'];
   let cfg = clone(DEFAULTS);
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
@@ -831,7 +843,7 @@
   const M_Y = 540, M_THICK0 = 129.945, M_LA = 338, M_LB0 = 510;
   const M_T1 = D_S - D_THIN;                     // thick slab's depth at contact: together they make a cube
   const M_LB1 = M_LA + M_T1;                     // thin slab's back face at contact
-  function mergeLayer(id, edges = true) {
+  function mergeLayer(id, edges = true, card = mergeCard) {
     const layer = document.createElement('div');
     layer.className = 'layer';
     const svg = document.createElementNS(NS, 'svg');
@@ -849,7 +861,7 @@
       Object.assign(L, { blur, lines: [...svg.querySelectorAll('line')], grads, stops: grads.map(g => [...g.querySelectorAll('stop')]),
         outline: svg.querySelector('path'), poly: null, vis: 1 });
     } else layer.appendChild(svg);
-    mergeCard.appendChild(layer);
+    card.appendChild(layer);
     return L;
   }
   // a box of square section s and depth t lying on its side (as 04/08), centred on (cx, cy),
@@ -891,24 +903,28 @@
   // the seam: the shared face's two visible edges, each drawn from the middle vertex outward with
   // a gradient that is sealed (clear) behind the spark and still a line ahead of it; a soft glow
   // copy carries only the spark
-  const mS = mergeLayer('mgS', false);
-  mS.svg.innerHTML = `<defs><filter id="mgGlow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
-    ${[0, 1].map(k => `<linearGradient id="mgS${k}" gradientUnits="userSpaceOnUse">${'<stop/>'.repeat(5)}</linearGradient>
-      <linearGradient id="mgSg${k}" gradientUnits="userSpaceOnUse">${'<stop/>'.repeat(3)}</linearGradient>`).join('')}</defs>
-    ${[0, 1].map(k => `<path class="seam-glow" stroke="url(#mgSg${k})" stroke-width="5" filter="url(#mgGlow)"/><path class="seam" stroke="url(#mgS${k})"/>`).join('')}`;
-  const seamLines = [0, 1].map(k => ({ line: mS.svg.querySelectorAll('.seam')[k], glow: mS.svg.querySelectorAll('.seam-glow')[k],
-    g: mS.svg.querySelector('#mgS' + k), gg: mS.svg.querySelector('#mgSg' + k) }));
-  mS.layer.style.zIndex = 5;
-  function drawSeam(x, p, o) {
-    mS.layer.style.visibility = o <= 0.001 ? 'hidden' : '';
+  function makeSeam(id, card) {
+    const S = mergeLayer(id, false, card);
+    S.svg.innerHTML = `<defs><filter id="${id}Glow" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="3"/></filter>
+      ${[0, 1].map(k => `<linearGradient id="${id}${k}" gradientUnits="userSpaceOnUse">${'<stop/>'.repeat(5)}</linearGradient>
+        <linearGradient id="${id}g${k}" gradientUnits="userSpaceOnUse">${'<stop/>'.repeat(3)}</linearGradient>`).join('')}</defs>
+      ${[0, 1].map(k => `<path class="seam-glow" stroke="url(#${id}g${k})" stroke-width="5" filter="url(#${id}Glow)"/><path class="seam" stroke="url(#${id}${k})"/>`).join('')}`;
+    S.seamLines = [0, 1].map(k => ({ line: S.svg.querySelectorAll('.seam')[k], glow: S.svg.querySelectorAll('.seam-glow')[k],
+      g: S.svg.querySelector(`#${id}${k}`), gg: S.svg.querySelector(`#${id}g${k}`) }));
+    S.layer.style.zIndex = 5;
+    return S;
+  }
+  const mS = makeSeam('mgS', mergeCard);
+  function drawSeam(S, x, p, o) {
+    S.layer.style.visibility = o <= 0.001 ? 'hidden' : '';
     if (o <= 0.001) return;
-    mS.svg.style.opacity = o.toFixed(3);
+    S.svg.style.opacity = o.toFixed(3);
     const V = [x, M_Y], ends = [[x + D_S / 2, M_Y - D_H], [x + D_S / 2, M_Y + D_H]], f = n => n.toFixed(2);
     // sealed | spark | line; the spark fades in at the start and burns out at the tips
     const spark = Math.sin(Math.PI * clamp01(p)), a = Math.max(0, p - 0.22), b = Math.min(1, p + 0.05);
     const LINE = 'var(--line)', SPARK = 'var(--tint, var(--accent))';
     const stops = [[0, LINE, p > 0 ? 0 : 1], [a, LINE, p > 0 ? 0 : 1], [p, SPARK, p > 0 ? spark : 1], [b, LINE, 1], [1, LINE, 1]];
-    seamLines.forEach((sl, k) => {
+    S.seamLines.forEach((sl, k) => {
       const d = `M${f(V[0])} ${f(V[1])}L${f(ends[k][0])} ${f(ends[k][1])}`;
       sl.line.setAttribute('d', d); sl.glow.setAttribute('d', d);
       for (const g of [sl.g, sl.gg]) { g.setAttribute('x1', f(V[0])); g.setAttribute('y1', f(V[1])); g.setAttribute('x2', f(ends[k][0])); g.setAttribute('y2', f(ends[k][1])); }
@@ -929,7 +945,7 @@
       drawBox(mA, M_LA + (D_S + tA) / 2, M_Y, D_S, tA, 0, 1);
       drawBox(mB, LB + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1);
       drawBox(mM, M_LA + D_S, M_Y, D_S, D_S, 0, 0);
-      drawSeam(M_LB1, 0, 0);
+      drawSeam(mS, M_LB1, 0, 0);
       return;
     }
     // impact: the block rings (stretches and settles) while the seam zips shut
@@ -942,7 +958,7 @@
     // the block's lines are the two slabs' outer lines, so they are there at full strength from
     // the moment of contact; only its pane crossfades with theirs
     drawBox(mM, M_LA + (D_S + tM) / 2, M_Y, D_S, tM, 0, swap, 1);
-    drawSeam(M_LB1, smooth(zip), 1 - smooth(zip * 6 - 5));   // gone once sealed
+    drawSeam(mS, M_LB1, smooth(zip), 1 - smooth(zip * 6 - 5));   // gone once sealed
   }
   const mergeFig = e => { const r = mergeCard.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1080, (e.clientY - r.top) / r.height * 1080]; };
   mergeCard.addEventListener('pointerenter', e => { mHover = true; mPt = mergeFig(e); });
@@ -1058,6 +1074,130 @@
     stepPartTint(suParts, suPt, dt);
   }
 
+  // ---------- Alternative versions (v2) of 01, 02 and 03 ----------
+  // Each lives in the same card as its v1, in layers of its own; the card's arrows switch which
+  // set is shown (see .card[data-v]).
+  function v2Layer(card, id) { const L = mergeLayer(id, true, card); L.layer.classList.add('v2'); return L; }
+  // A conveyor of slabs: on hover, every step each slab moves one slot to the right; the last
+  // one slides out to the right as it fades, and a new one fades in from the left. Ls / Ts are
+  // the resting left edge and depth of each slot, from the slot before the first (entering) to
+  // the one after the last (leaving), so a slab's depth follows the slot it is passing through.
+  function makeConveyor(card, id, Ls, Ts, Y, stepMs) {
+    const n = Ls.length - 2;                   // visible slots
+    const slabs = [...Array(n + 1)].map((_, i) => v2Layer(card, id + i));
+    const st = { P: 0, vel: 0, ret: null, hover: false, pt: null };
+    const render = () => {
+      const k = Math.floor(st.P), e = ease(clamp01((st.P - k) / 0.7));   // move, then a short pause
+      slabs.forEach((c, i) => {
+        const base = ((i + k) % (n + 1) + n + 1) % (n + 1);               // 0: waiting to enter
+        const sl = base - 1 + e, lo = Math.min(n - 1, Math.floor(sl)), fr = sl - lo;
+        const L = lerp(Ls[lo + 1], Ls[lo + 2], fr), t = lerp(Ts[lo + 1], Ts[lo + 2], fr);
+        const o = smooth(Math.min(sl + 1, n - sl));                      // fades in from the left, out to the right
+        drawBox(c, L + (D_S + t) / 2, Y, D_S, t, 0, o);
+        c.layer.style.zIndex = 10 + Math.round(sl * 10);                 // slabs further right draw on top
+      });
+    };
+    const fig = e => { const r = card.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1080, (e.clientY - r.top) / r.height * 1080]; };
+    card.addEventListener('pointerenter', e => { st.hover = true; st.pt = fig(e); });
+    card.addEventListener('pointermove', e => { st.pt = fig(e); });
+    card.addEventListener('pointerleave', () => { st.hover = false; st.pt = null; });
+    const parts = slabs.map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+    const step = dt => {
+      const full = cfg.motion.speed / stepMs, on = st.hover || cfg.preview, N = n + 1;
+      if (!on && (st.ret || st.vel > 0 || st.P % 1 !== 0)) {
+        // Return to rest: finish the step (every step ends on the resting frame)
+        if (!st.ret) st.ret = startGlide(st.P, st.vel * full, full);
+        st.vel = ramp(st.vel, false, dt);
+        if (!st.ret.done) { glide(st.ret, dt); st.P = st.ret.x; render(); }
+        if (st.ret.done) { st.P = ((st.P % N) + N) % N; render(); if (st.vel === 0) st.ret = null; }
+      } else {
+        if (st.ret) { st.ret = null; st.P = ((st.P % N) + N) % N; }
+        st.vel = ramp(st.vel, on, dt);
+        if (st.vel > 0) { st.P = (st.P + dt * st.vel * full) % N; render(); }
+      }
+      stepPartTint(parts, st.pt, dt);
+    };
+    return { render, step, st };
+  }
+  // 01 v2: four slabs as in the Figma frame; the one in the third slot is always the thick one,
+  // so each slab thickens as it moves into that slot and thins as it moves on
+  const SL_THIN = 29.42, SL_THICK = 129.42, SL_L = [271.58, 381.1, 431.11, 580.53];
+  const slicesV2 = makeConveyor($('#card-slices'), 'slV2',
+    [SL_L[0] - 109.5, ...SL_L, SL_L[3] + 109.5], [SL_THIN, SL_THIN, SL_THIN, SL_THICK, SL_THIN, SL_THIN], 540, 1400);
+  // 02 v2: three slabs as in its v1; the first slot is always the thick one: the new slab comes
+  // in thick, and each one thins as it moves on
+  const DV_L = [D_LEFT, D_LEFT + D_GAPS[0] + (D_FIG_THICK - D_THIN), D_LEFT + D_GAPS[0] + (D_FIG_THICK - D_THIN) + D_GAPS[1]];
+  const depthV2 = makeConveyor($('#card-depth'), 'dpV2',
+    [D_LEFT - D_GAPS[0] - (D_FIG_THICK - D_THIN), ...DV_L, DV_L[2] + D_GAPS[1]], [D_FIG_THICK, D_FIG_THICK, D_THIN, D_THIN, D_THIN], D_Y, 1400);
+  // 03 v2: the same collision and seal as v1, faster and on 04's speed curve; then the block
+  // thins back into the thin slab while a new thick slab fades in from the left, and it loops
+  const MV2_MS = 2600;
+  const mv = { A: v2Layer(mergeCard, 'mvA'), B: v2Layer(mergeCard, 'mvB'), M: v2Layer(mergeCard, 'mvM'), N: v2Layer(mergeCard, 'mvN') };
+  const mvS = makeSeam('mvS', mergeCard); mvS.layer.classList.add('v2');
+  // paint order as in the frame: thick slabs behind, the thin one (and the block that turns into it) in front
+  mv.A.layer.style.zIndex = mv.N.layer.style.zIndex = 1; mv.B.layer.style.zIndex = mv.M.layer.style.zIndex = 2;
+  const mvSt = { P: 0, vel: 0, ret: null, hover: false, pt: null };
+  function renderMergeV2() {
+    const f = mvSt.P - Math.floor(mvSt.P), seg = (a, b) => clamp01((f - a) / (b - a));
+    const HIT = 0.26, approach = seg(0, HIT), fuse = seg(HIT, 0.56), back = suEase(seg(0.62, 0.96));
+    if (f < HIT) {
+      const tA = lerp(M_THICK0, M_T1, suEase(approach)), LB = lerp(M_LB0, M_LB1, approach);
+      drawBox(mv.A, M_LA + (D_S + tA) / 2, M_Y, D_S, tA, 0, 1);
+      drawBox(mv.B, LB + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1);
+      drawBox(mv.M, M_LA + D_S, M_Y, D_S, D_S, 0, 0);
+      drawBox(mv.N, M_LA - 160 + (D_S + M_THICK0) / 2, M_Y, D_S, M_THICK0, 0, 0);
+      drawSeam(mvS, M_LB1, 0, 0);
+      return;
+    }
+    const ring = cfg.merge.impact * Math.sin(3 * Math.PI * fuse) * (1 - fuse) * (1 - fuse) * Math.exp(-1.5 * fuse);
+    const swap = smooth(fuse / 0.12), zip = clamp01((fuse - 0.08) / 0.72);
+    drawBox(mv.A, M_LA + (D_S + M_T1) / 2, M_Y, D_S, M_T1, 0, 1 - swap);
+    drawBox(mv.B, M_LB1 + ring + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1 - swap);
+    // the block thins back into the thin slab (its right side stays put) ...
+    const LM = lerp(M_LA, M_LB0, back), tM = lerp(D_S + ring, D_THIN, back);
+    drawBox(mv.M, LM + (D_S + tM) / 2, M_Y, D_S, tM, 0, swap, 1);
+    // ... while a new thick slab fades in from the left, landing where the first one started
+    const LN = lerp(M_LA - 160, M_LA, back);
+    drawBox(mv.N, LN + (D_S + M_THICK0) / 2, M_Y, D_S, M_THICK0, 0, smooth(back));
+    drawSeam(mvS, M_LB1, smooth(zip), 1 - smooth(zip * 6 - 5));
+  }
+  mergeCard.addEventListener('pointerenter', e => { mvSt.hover = true; mvSt.pt = mergeFig(e); });
+  mergeCard.addEventListener('pointermove', e => { mvSt.pt = mergeFig(e); });
+  mergeCard.addEventListener('pointerleave', () => { mvSt.hover = false; mvSt.pt = null; });
+  const mvParts = [mv.N, mv.M, mv.B, mv.A].map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  function stepMergeV2(dt) {
+    const full = cfg.motion.speed / MV2_MS, on = mvSt.hover || cfg.preview;
+    if (!on && (mvSt.ret || mvSt.vel > 0 || mvSt.P % 1 !== 0)) {
+      // Return to rest: finish the cycle (it ends on its starting frame)
+      if (!mvSt.ret) mvSt.ret = startGlide(mvSt.P, mvSt.vel * full, full);
+      mvSt.vel = ramp(mvSt.vel, false, dt);
+      if (!mvSt.ret.done) { glide(mvSt.ret, dt); mvSt.P = mvSt.ret.x; renderMergeV2(); }
+      if (mvSt.ret.done) { mvSt.P = ((mvSt.P % 1) + 1) % 1; renderMergeV2(); if (mvSt.vel === 0) mvSt.ret = null; }
+    } else {
+      if (mvSt.ret) { mvSt.ret = null; mvSt.P = ((mvSt.P % 1) + 1) % 1; }
+      mvSt.vel = ramp(mvSt.vel, on, dt);
+      if (mvSt.vel > 0) { mvSt.P = (mvSt.P + dt * mvSt.vel * full) % 1; renderMergeV2(); }
+    }
+    stepPartTint(mvParts, mvSt.pt, dt);
+  }
+  // version switch: an arrow on each side of the card; the title says when it shows the v2
+  const VERSIONED = ['slices', 'depth', 'merge'];
+  const ARROW = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+  for (const key of VERSIONED) {
+    const card = $('#card-' + key), tag = card.querySelector('.tag');
+    tag.dataset.base = tag.textContent;
+    card.insertAdjacentHTML('beforeend', `<button class="ver prev" type="button" aria-label="Previous version">${ARROW('M10 3 5 8l5 5')}</button>
+      <button class="ver next" type="button" aria-label="Next version">${ARROW('M6 3l5 5-5 5')}</button>`);
+    card.querySelectorAll('.ver').forEach(b => b.onclick = () => { cfg.versions[key] = cfg.versions[key] === 2 ? 1 : 2; save(); applyVersions(); });
+  }
+  function applyVersions() {
+    for (const key of VERSIONED) {
+      const card = $('#card-' + key), v = cfg.versions[key] === 2 ? 2 : 1, tag = card.querySelector('.tag');
+      card.dataset.v = v;
+      tag.textContent = tag.dataset.base + (v === 2 ? ' (Alternative version)' : '');
+    }
+  }
+
   // ---------- Follow pointer ----------
   // Every stroke near the pointer lights up, fading out by the Radius control, instead of the
   // hovered shape as a whole. The pointer is smoothed, and the effect fades in and out with the
@@ -1139,6 +1279,7 @@
     stepScaleUp(dt);
     stepDepth(dt);
     stepMerge(dt);
+    slicesV2.step(dt); depthV2.step(dt); stepMergeV2(dt);
     stepFollow(dt);
     requestAnimationFrame(tick);
   }
@@ -1216,7 +1357,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderDepth(); renderMerge(); renderScaleUp(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderDepth(); renderMerge(); renderScaleUp(); slicesV2.render(); depthV2.render(); renderMergeV2(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
   function fieldRow(f, obj, id) {
@@ -1339,7 +1480,9 @@
   applyAll();
   requestAnimationFrame(tick);
   // console handle for scrubbing the loop: __motion.seek(0..1)
-  window.__motion = { seekScaleUp: v => { suP = v; renderScaleUp(); }, seekDepth: u => { dU = u; renderDepth(); }, seekMerge: t => { mT = t; renderMerge(); },
+  window.__motion = { seekScaleUp: v => { suP = v; renderScaleUp(); },
+    seekV2: (key, v) => { const st = key === 'merge' ? mvSt : (key === 'slices' ? slicesV2 : depthV2).st;
+      Object.assign(st, { P: v, ret: null, vel: 0 }); if (key === 'merge') renderMergeV2(); else (key === 'slices' ? slicesV2 : depthV2).render(); }, seekDepth: u => { dU = u; renderDepth(); }, seekMerge: t => { mT = t; renderMerge(); },
     // pose a spinning layer at an angle (degrees): __motion.spinAt('slices-layer-3', 45)
     spinAt: (id, deg) => { for (const h of HOVER) { const sp = h.byId[id]; if (sp && sp.spin) { sp.spin.a = sp.spin.target = deg * Math.PI / 180; if (deg % 90) sp.spin.draw(sp.layer.blur); else sp.spin.restore(sp.layer.blur); } } } };
 })();
