@@ -177,9 +177,10 @@
   .tune-body .link { background: none; border: 0; padding: 0; margin: 4px 0 2px; font: inherit; font-size: 12px; color: var(--muted); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
   .tune-body .link:hover { color: var(--text); }
 
-  /* versions: a card shows its v1 layers, or its v2 layers when data-v="2" */
-  .card[data-v="2"] > .layer:not(.v2), .card[data-v="2"] > .hits-svg { display: none; }
-  .card:not([data-v="2"]) > .layer.v2 { display: none; }
+  /* versions: a card shows its v1 layers, or only its v2 / v3 layers when data-v says so */
+  .card[data-v="2"] > .layer:not(.v2), .card[data-v="3"] > .layer:not(.v3),
+  .card[data-v="2"] > .hits-svg, .card[data-v="3"] > .hits-svg { display: none; }
+  .card:not([data-v="2"]) > .layer.v2, .card:not([data-v="3"]) > .layer.v3 { display: none; }
   .ver {
     position: absolute; top: 50%; transform: translateY(-50%); z-index: 300; display: grid; place-items: center;
     width: 32px; height: 48px; padding: 0; border: 0; background: none; color: var(--muted); cursor: pointer; transition: color .2s;
@@ -1162,21 +1163,157 @@
     }
     stepPartTint(su2Parts, su2St.pt, dt);
   }
-  // version switch: an arrow on each side of the card; the title says when it shows the v2
-  const VERSIONED = ['slices', 'depth', 'merge', 'scaleup'];
+  // ---------- v3s: static shapes; hovering a shape plays its move, leaving plays it back ----------
+  const v3Layer = (card, id) => { const L = mergeLayer(id, true, card); L.layer.classList.add('v3'); return L; };
+  const figOf = (card, e) => { const r = card.getBoundingClientRect(); return [(e.clientX - r.left) / r.width * 1080, (e.clientY - r.top) / r.height * 1080]; };
+  // 01 / 02 v3: the slabs stay put; the one under the pointer grows deeper on the hover spring,
+  // the ones to its right make room, and the row stays centred. The hovered slab keeps the hover
+  // until the pointer leaves it, so shapes shifting underneath can't make it flicker between two.
+  function makeGrowRow(card, id, L, T, Y, grow) {
+    const slabs = L.map((_, i) => v3Layer(card, id + i));
+    slabs.forEach((c, i) => { c.layer.style.zIndex = 10 + i; });     // slabs further right draw on top
+    const st = { pt: null, hot: -1, x: L.map(() => 0), v: L.map(() => 0), drawn: false };
+    card.addEventListener('pointerenter', e => { st.pt = figOf(card, e); });
+    card.addEventListener('pointermove', e => { st.pt = figOf(card, e); });
+    card.addEventListener('pointerleave', () => { st.pt = null; });
+    const render = () => {
+      const ext = st.x.map(x => grow * x);
+      let acc = -ext.reduce((a, b) => a + b, 0) / 2;
+      slabs.forEach((c, i) => { const t = T[i] + ext[i]; drawBox(c, L[i] + acc + (D_S + t) / 2, Y, D_S, t, 0, 1); acc += ext[i]; });
+    };
+    const parts = [...slabs].reverse().map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+    const step = dt => {
+      if (!st.pt) st.hot = -1;
+      else if (!(st.hot >= 0 && inPoly(st.pt, slabs[st.hot].poly))) {
+        st.hot = -1;
+        for (let i = slabs.length - 1; i >= 0; i--) if (slabs[i].poly && inPoly(st.pt, slabs[i].poly)) { st.hot = i; break; }
+      }
+      const w = 2 * Math.PI * cfg.motion.speed / CURVES[cfg.motion.curve].response, k = w * w, c = 2 * damping() * w;
+      const n = Math.max(1, Math.ceil(dt / 4)), hs = dt / 1000 / n;
+      let moved = !st.drawn;
+      st.x.forEach((x, i) => {
+        const target = cfg.preview || i === st.hot ? 1 : 0;
+        if (Math.abs(target - x) < 1e-4 && Math.abs(st.v[i]) < 1e-4) { if (x !== target) { st.x[i] = target; st.v[i] = 0; moved = true; } return; }
+        if (reduceMotion.matches) { st.x[i] = target; st.v[i] = 0; }
+        else for (let j = 0; j < n; j++) { st.v[i] += (k * (target - st.x[i]) - c * st.v[i]) * hs; st.x[i] += st.v[i] * hs; }
+        moved = true;
+      });
+      if (moved) { render(); st.drawn = true; }
+      stepPartTint(parts, st.pt, dt);
+    };
+    return { render, step };
+  }
+  const V3_GROW = 80;   // how much deeper the hovered slab gets (Figma px)
+  const slicesV3 = makeGrowRow($('#card-slices'), 'slV3', SL_L, [SL_THIN, SL_THIN, SL_THICK, SL_THIN], 540, V3_GROW);
+  const depthV3 = makeGrowRow($('#card-depth'), 'dpV3', DV_L, [D_FIG_THICK, D_THIN, D_THIN], D_Y, V3_GROW);
+  // 03 v3: the two slabs stay put. Hovering the thick one plays v1's collision (it grows into the
+  // thin one); hovering the thin one plays it the other way round: the thin one widens to the
+  // left while the thick one thins, and they meet and seal into the same cube. Leaving plays back.
+  const m3 = { A: v3Layer(mergeCard, 'm3A'), B: v3Layer(mergeCard, 'm3B'), M: v3Layer(mergeCard, 'm3M') };
+  const m3S = makeSeam('m3S', mergeCard); m3S.layer.classList.add('v3');
+  m3.A.layer.style.zIndex = 1; m3.B.layer.style.zIndex = m3.M.layer.style.zIndex = 2;
+  const m3St = { T: 0, V: 0, mode: 'A', armed: false, pt: null };
+  function renderMergeV3() {
+    const seg = (a, b) => clamp01((m3St.T - a) / (b - a)), HIT = 0.34 / 0.6;
+    const approach = seg(0, HIT), fuse = seg(HIT, 1), k = Math.pow(approach, 2.4), R = M_LA + 2 * D_S;   // R: the cube's right edge
+    const ring = cfg.merge.impact * Math.sin(3 * Math.PI * fuse) * (1 - fuse) * (1 - fuse) * Math.exp(-1.5 * fuse);
+    const swap = smooth(fuse / 0.12), zip = clamp01((fuse - 0.08) / 0.72);
+    if (m3St.mode === 'A') {   // as v1
+      if (m3St.T < HIT) {
+        const tA = lerp(M_THICK0, M_T1, k), LB = lerp(M_LB0, M_LB1, approach);
+        drawBox(m3.A, M_LA + (D_S + tA) / 2, M_Y, D_S, tA, 0, 1);
+        drawBox(m3.B, LB + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1);
+        drawBox(m3.M, M_LA + D_S, M_Y, D_S, D_S, 0, 0);
+        drawSeam(m3S, M_LB1, 0, 0);
+        return;
+      }
+      drawBox(m3.A, M_LA + (D_S + M_T1) / 2, M_Y, D_S, M_T1, 0, 1 - swap);
+      drawBox(m3.B, M_LB1 + ring + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1 - swap);
+      drawBox(m3.M, M_LA + (D_S + D_S + ring) / 2, M_Y, D_S, D_S + ring, 0, swap, 1);
+      drawSeam(m3S, M_LB1, smooth(zip), 1 - smooth(zip * 6 - 5));
+      return;
+    }
+    // mode B, the mirror: the thin slab widens leftward (its right side slides to the cube's right
+    // edge) while the thick one thins, until the thin one's back meets the thick one's front
+    const X = M_LA + D_THIN;                                   // where they meet
+    if (m3St.T < HIT) {
+      const tA = lerp(M_THICK0, D_THIN, k), tB = lerp(D_THIN, D_S - D_THIN, k);
+      const RB = lerp(M_LB0 + D_S + D_THIN, R, approach), LB = RB - D_S - tB;
+      drawBox(m3.A, M_LA + (D_S + tA) / 2, M_Y, D_S, tA, 0, 1);
+      drawBox(m3.B, LB + (D_S + tB) / 2, M_Y, D_S, tB, 0, 1);
+      drawBox(m3.M, M_LA + D_S, M_Y, D_S, D_S, 0, 0);
+      drawSeam(m3S, X, 0, 0);
+      return;
+    }
+    drawBox(m3.A, M_LA - ring + (D_S + D_THIN) / 2, M_Y, D_S, D_THIN, 0, 1 - swap);
+    drawBox(m3.B, X + (D_S + D_S - D_THIN) / 2, M_Y, D_S, D_S - D_THIN, 0, 1 - swap);
+    drawBox(m3.M, M_LA - ring + (D_S + D_S + ring) / 2, M_Y, D_S, D_S + ring, 0, swap, 1);
+    drawSeam(m3S, X, smooth(zip), 1 - smooth(zip * 6 - 5));
+  }
+  mergeCard.addEventListener('pointerenter', e => { m3St.pt = mergeFig(e); });
+  mergeCard.addEventListener('pointermove', e => { m3St.pt = mergeFig(e); });
+  mergeCard.addEventListener('pointerleave', () => { m3St.pt = null; m3St.armed = false; });
+  const m3Parts = [m3.M, m3.B, m3.A].map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  function stepMergeV3(dt) {
+    // which way it plays is picked at rest by the slab the pointer lands on (the thin one draws on top)
+    if (!m3St.armed && m3St.T === 0 && m3St.pt) {
+      if (m3.B.poly && inPoly(m3St.pt, m3.B.poly)) { m3St.mode = 'B'; m3St.armed = true; }
+      else if (m3.A.poly && inPoly(m3St.pt, m3.A.poly)) { m3St.mode = 'A'; m3St.armed = true; }
+    }
+    const target = m3St.armed || cfg.preview ? 1 : -1, r = cfg.motion.smoothing;
+    m3St.V = r <= 0 ? target : m3St.V + (target - m3St.V) * (1 - Math.exp(-dt / (r / 3)));
+    const was = m3St.T;
+    m3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(m3St.T + m3St.V * dt * cfg.motion.speed / MERGE_MS);
+    if (m3St.T !== was) renderMergeV3();
+    stepPartTint(m3Parts, m3St.pt, dt);
+  }
+  // 04 v3: static; hovering the window plays v2's growth (it scales up and extrudes into the big
+  // cube while the big one flattens away and fades) and holds; leaving the card plays it back
+  const S3_MS = 1700;
+  const s3 = { B: suLayer('s3B'), W: suLayer('s3W') };
+  for (const c of Object.values(s3)) c.layer.classList.add('v3');
+  s3.B.layer.style.zIndex = 1; s3.W.layer.style.zIndex = 2;
+  const s3St = { T: 0, V: 0, armed: false, pt: null };
+  function renderScaleUpV3() {
+    const g = suEase(s3St.T), h = SU_E / 2, fade = 1 - smooth(s3St.T / 0.8);
+    drawSU(s3.B, -h, h, -h, h, -h, Math.max(-h + 0.01, lerp(h, -h, g)), fade, fade);
+    const es = lerp(SU_ES, SU_E, g), C = SU_C.map(v => lerp(v, 0, g)), hs = es / 2, z1 = C[2] + hs;
+    drawSU(s3.W, C[0] - hs, C[0] + hs, C[1] - hs, C[1] + hs, z1 - Math.max(0.01, g * es), z1, 1, 1, smooth(g * 2));
+  }
+  scaleupCard.addEventListener('pointerenter', e => { s3St.pt = suFig(e); });
+  scaleupCard.addEventListener('pointermove', e => { s3St.pt = suFig(e); });
+  scaleupCard.addEventListener('pointerleave', () => { s3St.pt = null; s3St.armed = false; });
+  const s3Parts = [s3.W, s3.B].map(c => ({ layers: [c.layer], tint: c.stops, over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  function stepScaleUpV3(dt) {
+    if (!s3St.armed && s3St.pt && s3.W.poly && inPoly(s3St.pt, s3.W.poly)) s3St.armed = true;   // the window starts it
+    const target = s3St.armed || cfg.preview ? 1 : -1, r = cfg.motion.smoothing;
+    s3St.V = r <= 0 ? target : s3St.V + (target - s3St.V) * (1 - Math.exp(-dt / (r / 3)));
+    const was = s3St.T;
+    s3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(s3St.T + s3St.V * dt * cfg.motion.speed / S3_MS);
+    if (s3St.T !== was) renderScaleUpV3();
+    stepPartTint(s3Parts, s3St.pt, dt);
+  }
+
+  // version switch: an arrow on each side of the card steps through the versions; the title
+  // says which alternative is showing
+  const VERSIONED = ['slices', 'depth', 'merge', 'scaleup'], N_VERSIONS = 3;
+  const VERSION_NAMES = { 2: ' (Alternative version)', 3: ' (Alternative version 2)' };
   const ARROW = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
   for (const key of VERSIONED) {
     const card = $('#card-' + key), tag = card.querySelector('.tag');
     tag.dataset.base = tag.textContent;
     card.insertAdjacentHTML('beforeend', `<button class="ver prev" type="button" aria-label="Previous version">${ARROW('M10 3 5 8l5 5')}</button>
       <button class="ver next" type="button" aria-label="Next version">${ARROW('M6 3l5 5-5 5')}</button>`);
-    card.querySelectorAll('.ver').forEach(b => b.onclick = () => { cfg.versions[key] = cfg.versions[key] === 2 ? 1 : 2; save(); applyVersions(); });
+    card.querySelectorAll('.ver').forEach(b => b.onclick = () => {
+      const d = b.classList.contains('next') ? 1 : N_VERSIONS - 1, v = (cfg.versions[key] || 1) - 1;
+      cfg.versions[key] = (v + d) % N_VERSIONS + 1; save(); applyVersions();
+    });
   }
   function applyVersions() {
     for (const key of VERSIONED) {
-      const card = $('#card-' + key), v = cfg.versions[key] === 2 ? 2 : 1, tag = card.querySelector('.tag');
+      const card = $('#card-' + key), v = [2, 3].includes(cfg.versions[key]) ? cfg.versions[key] : 1, tag = card.querySelector('.tag');
       card.dataset.v = v;
-      tag.textContent = tag.dataset.base + (v === 2 ? ' (Alternative version)' : '');
+      tag.textContent = tag.dataset.base + (VERSION_NAMES[v] || '');
     }
   }
 
@@ -1262,6 +1399,7 @@
     stepDepth(dt);
     stepMerge(dt);
     slicesV2.step(dt); depthV2.step(dt); stepMergeV2(dt); stepScaleUpV2(dt);
+    slicesV3.step(dt); depthV3.step(dt); stepMergeV3(dt); stepScaleUpV3(dt);
     stepFollow(dt);
     requestAnimationFrame(tick);
   }
@@ -1339,7 +1477,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderDepth(); renderMerge(); renderScaleUp(); slicesV2.render(); depthV2.render(); renderMergeV2(); renderScaleUpV2(); applyVersions(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderDepth(); renderMerge(); renderScaleUp(); slicesV2.render(); depthV2.render(); renderMergeV2(); renderScaleUpV2(); slicesV3.render(); depthV3.render(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
   function fieldRow(f, obj, id) {

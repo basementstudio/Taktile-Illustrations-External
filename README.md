@@ -20,6 +20,12 @@ Every card also has an **alternative version**: the arrows on each side of the c
 - 03: the collision and seal, faster; then the block thins back into the thin slab as a new thick one fades in from the left, and it loops
 - 04: the window scales up and extrudes at once into the big cube, while the old cube flattens toward the back and fades; then a new window opens
 
+A second alternative (**v3**, "Alternative version 2") keeps the shapes static and plays a move only for the shape under the pointer:
+
+- 01 / 02: the hovered slab grows deeper, the others make room; leaving puts it back
+- 03: hovering the thick slab plays the collision; hovering the thin one plays it mirrored (the thin one widens left while the thick one thins); leaving plays back
+- 04: hovering the window plays v2's growth into the big cube; leaving plays back
+
 All alternative versions move on the same sharp-peak speed curve. In 01 and 02 the leaving and arriving slabs travel far past the end slots and narrow out there.
 
 - The side panel only holds what every animation shares: Motion, BG Blur, colour options, Follow pointer, Preview.
