@@ -18,13 +18,13 @@ Every card also has an **alternative version**: the arrows on each side of the c
 - 01: a conveyor; on hover the last slab slides out right as a new one fades in from the left, and the slab in the third slot is always the thick one
 - 02: the same conveyor with the first slot always thick
 - 03: the collision and seal, faster; then the block thins back into the thin slab as a new thick one fades in from the left, and it loops
-- 04: the cube lies on its side (Figma 7907:5126); hovering its window extrudes it backwards by a quarter of the cube's edge, moving off lets it spring back
+- 04: the window scales up and extrudes at once into the big cube, while the old cube flattens toward the back and fades; then a new window opens
 
 A second alternative (**v3**, "Alternative version 2") keeps the shapes static and plays a move only for the shape under the pointer:
 
 - 01 / 02: the hovered slab takes the thick depth and the thick one thins (only one thick slab at a time); leaving puts it back
 - 03: hovering the thick slab plays the collision; hovering the thin one plays it mirrored (the thin one widens left while the thick one thins); leaving plays back
-- 04: hovering the window starts v2's loop, which keeps coming back round to the window while the pointer stays on the shapes; moving off finishes the cycle
+- 04: the cube lies on its side (Figma 7907:5126); hovering its window extrudes it back into a thin block (a quarter of its size deep) while the cube's face recedes to make room; moving off springs back
 
 All alternative versions move on the same sharp-peak speed curve. In 01 and 02 the leaving and arriving slabs travel far past the end slots and narrow out there.
 
