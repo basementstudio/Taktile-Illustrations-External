@@ -1192,19 +1192,21 @@
   for (const c of Object.values(su2)) c.layer.classList.add('v2');
   su2.B.layer.style.zIndex = 1; su2.W.layer.style.zIndex = 2; su2.N.layer.style.zIndex = 3;
   const su2St = { P: 0, vel: 0, ret: null, hover: false, pt: null };
-  function renderScaleUpV2() {
-    const f = su2St.P - Math.floor(su2St.P), seg = (a, b) => clamp01((f - a) / (b - a)), h = SU_E / 2;
-    const g = suEase(seg(0.04, 0.62)), open = ease(seg(0.72, 0.94));
+  function renderScaleUpV2() { drawSUCycle(su2, su2St.P, suEase); }
+  // one cycle of 04's v2 move, for layers L = { B, W, N } at loop position P; grow: its speed curve
+  function drawSUCycle(L, P, grow) {
+    const f = P - Math.floor(P), seg = (a, b) => clamp01((f - a) / (b - a)), h = SU_E / 2;
+    const g = grow(seg(0.04, 0.62)), open = ease(seg(0.72, 0.94));
     // the big cube: its depth shrinks toward the back while it fades
     const zFront = lerp(h, -h, g);
-    drawSU(su2.B, -h, h, -h, h, -h, Math.max(-h + 0.01, zFront), 1 - smooth(seg(0.04, 0.5)), 1 - smooth(seg(0.04, 0.5)));
+    drawSU(L.B, -h, h, -h, h, -h, Math.max(-h + 0.01, zFront), 1 - smooth(seg(0.04, 0.5)), 1 - smooth(seg(0.04, 0.5)));
     // the window: grows from the small front face into the whole cube, scaling and extruding at once
     const es = lerp(SU_ES, SU_E, g), C = SU_C.map(v => lerp(v, 0, g)), hs = es / 2, z1 = C[2] + hs;
-    drawSU(su2.W, C[0] - hs, C[0] + hs, C[1] - hs, C[1] + hs, z1 - Math.max(0.01, g * es), z1, 1, 1, smooth(g * 2));
+    drawSU(L.W, C[0] - hs, C[0] + hs, C[1] - hs, C[1] + hs, z1 - Math.max(0.01, g * es), z1, 1, 1, smooth(g * 2));
     // a new window opens on the new cube, from its bottom edge
-    if (open <= 0.0005) drawSU(su2.N, 0, 0, 0, 0, 0, 0, 0, 0);
+    if (open <= 0.0005) drawSU(L.N, 0, 0, 0, 0, 0, 0, 0, 0);
     else { const x0 = SU_C[0] - SU_ES / 2, y0 = SU_C[1] - SU_ES / 2, zz = SU_C[2] + SU_ES / 2;
-      drawSU(su2.N, x0, x0 + SU_ES, y0, y0 + open * SU_ES, zz - 0.01, zz, smooth(open), 1, 0); }
+      drawSU(L.N, x0, x0 + SU_ES, y0, y0 + open * SU_ES, zz - 0.01, zz, smooth(open), 1, 0); }
   }
   scaleupCard.addEventListener('pointerenter', e => { su2St.hover = true; su2St.pt = suFig(e); });
   scaleupCard.addEventListener('pointermove', e => { su2St.pt = suFig(e); });
@@ -1283,10 +1285,13 @@
   const m3 = { A: v3Layer(mergeCard, 'm3A'), B: v3Layer(mergeCard, 'm3B'), M: v3Layer(mergeCard, 'm3M') };
   const m3S = makeSeam('m3S', mergeCard); m3S.layer.classList.add('v3');
   m3.A.layer.style.zIndex = 1; m3.B.layer.style.zIndex = m3.M.layer.style.zIndex = 2;
-  const m3St = { T: 0, V: 0, mode: 'A', armed: false, pt: null };
+  // T is the (already eased) position along the move; each time the pointer moves on or off the
+  // shapes a new ease-out runs from wherever T is to the end it now heads for, so the move answers
+  // at once and also lands softly on the way back
+  const m3St = { T: 0, mode: 'A', armed: false, pt: null, tw: null };
   function renderMergeV3() {
     const seg = (a, b) => clamp01((m3St.T - a) / (b - a)), HIT = 0.34 / 0.6;
-    const approach = seg(0, HIT), fuse = seg(HIT, 1), k = easeOutV3(approach), R = M_LA + 2 * D_S;   // R: the cube's right edge
+    const approach = seg(0, HIT), fuse = seg(HIT, 1), k = approach, R = M_LA + 2 * D_S;   // R: the cube's right edge
     const ring = cfg.merge.impact * Math.sin(3 * Math.PI * fuse) * (1 - fuse) * (1 - fuse) * Math.exp(-1.5 * fuse);
     const swap = smooth(fuse / 0.12), zip = clamp01((fuse - 0.08) / 0.72);
     if (m3St.mode === 'A') {   // as v1
@@ -1336,39 +1341,48 @@
       else if (on(m3.A)) { m3St.mode = 'A'; m3St.armed = true; }
       else m3St.armed = false;
     } else m3St.armed = on(m3.A) || on(m3.B) || on(m3.M);
-    const target = m3St.armed || cfg.preview ? 1 : -1;
-    const was = m3St.T;
-    m3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(m3St.T + target * dt * cfg.motion.speed / V3_MS);
+    const to = m3St.armed || cfg.preview ? 1 : 0;
+    if (!m3St.tw || m3St.tw.to !== to) m3St.tw = { from: m3St.T, to, e: 0, dur: Math.max(1, V3_MS * Math.abs(to - m3St.T)) };
+    const was = m3St.T, tw = m3St.tw;
+    if (reduceMotion.matches) m3St.T = to;
+    else if (m3St.T !== to) { tw.e = Math.min(tw.dur, tw.e + dt * cfg.motion.speed); m3St.T = lerp(tw.from, tw.to, easeOutV3(tw.e / tw.dur)); }
     if (m3St.T !== was) renderMergeV3();
     stepPartTint(m3Parts, m3St.pt, dt);
   }
-  // 04 v3: static; hovering the window plays v2's growth (it scales up and extrudes into the big
-  // cube while the big one flattens away and fades) and holds; moving off it plays it back
-  const s3 = { B: suLayer('s3B'), W: suLayer('s3W') };
+  // 04 v3: static until the pointer lands on the window; then it runs v2's loop (the window
+  // grows into the cube, the old cube flattens away, a new window opens) for as long as the
+  // pointer stays on the shapes, always coming back round to the window. Moving off finishes the
+  // cycle it is in, never plays backwards.
+  const S3_MS = 2400;
+  const s3 = { B: suLayer('s3B'), W: suLayer('s3W'), N: suLayer('s3N') };
   for (const c of Object.values(s3)) c.layer.classList.add('v3');
-  s3.B.layer.style.zIndex = 1; s3.W.layer.style.zIndex = 2;
-  const s3St = { T: 0, V: 0, armed: false, pt: null };
-  function renderScaleUpV3() {
-    const g = suEaseV3(s3St.T), h = SU_E / 2, fade = 1 - smooth(s3St.T / 0.8);
-    drawSU(s3.B, -h, h, -h, h, -h, Math.max(-h + 0.01, lerp(h, -h, g)), fade, fade);
-    const es = lerp(SU_ES, SU_E, g), C = SU_C.map(v => lerp(v, 0, g)), hs = es / 2, z1 = C[2] + hs;
-    drawSU(s3.W, C[0] - hs, C[0] + hs, C[1] - hs, C[1] + hs, z1 - Math.max(0.01, g * es), z1, 1, 1, smooth(g * 2));
-  }
+  s3.B.layer.style.zIndex = 1; s3.W.layer.style.zIndex = 2; s3.N.layer.style.zIndex = 3;
+  const s3St = { P: 0, vel: 0, ret: null, armed: false, pt: null };
+  const renderScaleUpV3 = () => drawSUCycle(s3, s3St.P, suEaseV3);
   scaleupCard.addEventListener('pointerenter', e => { s3St.pt = suFig(e); });
   scaleupCard.addEventListener('pointermove', e => { s3St.pt = suFig(e); });
   scaleupCard.addEventListener('pointerleave', () => { s3St.pt = null; });
-  const s3Parts = [s3.W, s3.B].map(c => ({ layers: [c.layer], tint: c.stops, over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  const s3Parts = [s3.N, s3.W, s3.B].map(c => ({ layers: [c.layer], tint: c.stops, over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
   function stepScaleUpV3(dt) {
-    // plays only while the pointer is on the window, as drawn (it grows under the pointer)
-    s3St.armed = !!s3St.pt && !!s3.W.poly && inPoly(s3St.pt, s3.W.poly);
-    const target = s3St.armed || cfg.preview ? 1 : -1;
-    const was = s3St.T;
-    s3St.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(s3St.T + target * dt * cfg.motion.speed / V3_MS);
-    if (s3St.T !== was) renderScaleUpV3();
-    stepPartTint(s3Parts, s3St.pt, dt);
+    const pt = s3St.pt, on = c => c.vis > 0.5 && !!c.poly && inPoly(pt, c.poly);
+    const atRest = s3St.P % 1 === 0 && !s3St.ret && s3St.vel === 0;
+    s3St.armed = !!pt && (atRest ? on(s3.W) : on(s3.B) || on(s3.W) || on(s3.N));   // the window starts it
+    const full = cfg.motion.speed / S3_MS;
+    if (!(s3St.armed || cfg.preview) && (s3St.ret || s3St.vel > 0 || s3St.P % 1 !== 0)) {
+      // off the shapes: finish the cycle, easing out, and rest on the window
+      if (!s3St.ret) s3St.ret = startGlide(s3St.P, s3St.vel * full, full);
+      s3St.vel = 0;
+      if (!s3St.ret.done) { glide(s3St.ret, dt); s3St.P = s3St.ret.x; renderScaleUpV3(); }
+      if (s3St.ret.done) { s3St.P = 0; s3St.ret = null; renderScaleUpV3(); }
+    } else if (s3St.armed || cfg.preview) {
+      if (s3St.ret) { s3St.ret = null; s3St.P = ((s3St.P % 1) + 1) % 1; }
+      s3St.vel = 1;                                                      // no start ramp: it answers at once
+      s3St.P = (s3St.P + dt * full) % 1; renderScaleUpV3();
+    }
+    stepPartTint(s3Parts, pt, dt);
   }
 
-  // version switch: an arrow on each side of the card steps through the versions; the title
+    // version switch: an arrow on each side of the card steps through the versions; the title
   // says which alternative is showing
   const VERSIONED = ['slices', 'depth', 'merge', 'scaleup'], N_VERSIONS = 3;
   const VERSION_NAMES = { 2: ' (Alternative version)', 3: ' (Alternative version 2)' };

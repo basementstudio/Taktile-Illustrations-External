@@ -24,7 +24,7 @@ A second alternative (**v3**, "Alternative version 2") keeps the shapes static a
 
 - 01 / 02: the hovered slab takes the thick depth and the thick one thins (only one thick slab at a time); leaving puts it back
 - 03: hovering the thick slab plays the collision; hovering the thin one plays it mirrored (the thin one widens left while the thick one thins); leaving plays back
-- 04: hovering the window plays v2's growth into the big cube; leaving plays back
+- 04: hovering the window starts v2's loop, which keeps coming back round to the window while the pointer stays on the shapes; moving off finishes the cycle
 
 All alternative versions move on the same sharp-peak speed curve. In 01 and 02 the leaving and arriving slabs travel far past the end slots and narrow out there.
 
