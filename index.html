@@ -1184,16 +1184,48 @@
     }
     stepPartTint(mvParts, mvSt.pt, dt);
   }
-  // 04 v2: the window scales up and extrudes at the same time, taking the big cube's shape, while
-  // the big cube flattens (its front face recedes to the back) to make room and fades out; then a
-  // new window opens on the new cube, as in v1, which is the resting frame again
-  const SU2_MS = 3000;
-  const su2 = { B: suLayer('su2B'), W: suLayer('su2W'), N: suLayer('su2N') };
-  for (const c of Object.values(su2)) c.layer.classList.add('v2');
-  su2.B.layer.style.zIndex = 1; su2.W.layer.style.zIndex = 2; su2.N.layer.style.zIndex = 3;
-  const su2St = { P: 0, vel: 0, ret: null, hover: false, pt: null };
-  function renderScaleUpV2() { drawSUCycle(su2, su2St.P, suEase); }
-  // one cycle of 04's v2 move, for layers L = { B, W, N } at loop position P; grow: its speed curve
+  // 04 v2: the cube lying on its side (Figma 7907:5126) with a small window on its lower-left face.
+  // Hovering the window extrudes it backwards, into the cube, by a quarter of the cube's edge; it
+  // only gets deeper, never bigger. Moving off it lets it spring back flat.
+  const s2 = { C: v2Layer(scaleupCard, 'sv2C'), W: suLayer('sv2W') };
+  s2.W.layer.classList.add('v2'); s2.C.layer.style.zIndex = 1; s2.W.layer.style.zIndex = 2;
+  const S2_CX = M_LA + D_S, S2_H = D_S / 2;                     // the cube's centre x, and half its edge
+  // a point in the cube's own frame (as drawBox lays it on its side) to the screen
+  const s2Proj = ([X, Y, Z]) => [S2_CX - (0.5 * X - Y + 0.5 * Z), M_Y + C30 * (X - Z)];
+  // the window in Figma, on the cube's +X face (the lower-left one): Y and Z ranges in that frame
+  const S2_WY = [-85, -26], S2_WZ = [31.9, 88.4], S2_DEPTH = D_S * 0.25;
+  const s2St = { d: 0, v: 0, pt: null, drawn: false };
+  function drawS2Window(d) {
+    const c = s2.W, f = n => n.toFixed(2), x1 = S2_H, x0 = S2_H - Math.max(0.01, d), [y0, y1] = S2_WY, [z0, z1] = S2_WZ;
+    c.vis = 1; c.layer.style.visibility = '';
+    const S = [];
+    for (const X of [x0, x1]) for (const Y of [y0, y1]) for (const Z of [z0, z1]) S.push(s2Proj([X, Y, Z]));
+    const front = s2Proj([x1, y1, z1]), ends = [[x0, y1, z1], [x1, y0, z1], [x1, y1, z0]].map(s2Proj);
+    c.lines.forEach((ln, k) => {
+      ln.setAttribute('stroke-opacity', smooth(d / 15).toFixed(3));
+      for (const el of [ln, c.grads[k]]) { el.setAttribute('x1', f(front[0])); el.setAttribute('y1', f(front[1])); el.setAttribute('x2', f(ends[k][0])); el.setAttribute('y2', f(ends[k][1])); }
+    });
+    const H = hull(S);
+    c.outline.setAttribute('d', 'M' + H.map(([x, y]) => `${f(x)} ${f(y)}`).join('L') + 'Z');
+    setMask(c.blur, H); c.poly = H;
+    c.blur.style.opacity = c.svg.style.opacity = '1';
+  }
+  function renderScaleUpV2() { drawBox(s2.C, S2_CX, M_Y, D_S, D_S, 0, 1); drawS2Window(s2St.d); s2St.drawn = true; }
+  scaleupCard.addEventListener('pointerenter', e => { s2St.pt = suFig(e); });
+  scaleupCard.addEventListener('pointermove', e => { s2St.pt = suFig(e); });
+  scaleupCard.addEventListener('pointerleave', () => { s2St.pt = null; });
+  const s2Parts = [s2.W, s2.C].map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  function stepScaleUpV2(dt) {
+    const target = (s2St.pt && s2.W.poly && inPoly(s2St.pt, s2.W.poly)) || cfg.preview ? S2_DEPTH : 0;
+    if (Math.abs(target - s2St.d) > 0.01 || Math.abs(s2St.v) > 0.01) {
+      const w = 2 * Math.PI * cfg.motion.speed / (CURVES[cfg.motion.curve].response * V3_SPRING), k = w * w, c = 2 * damping() * w;
+      const n = Math.max(1, Math.ceil(dt / 4)), hs = dt / 1000 / n;
+      if (reduceMotion.matches) { s2St.d = target; s2St.v = 0; }
+      else for (let j = 0; j < n; j++) { s2St.v += (k * (target - s2St.d) - c * s2St.v) * hs; s2St.d += s2St.v * hs; }
+      drawS2Window(s2St.d);
+    } else if (s2St.d !== target) { s2St.d = target; s2St.v = 0; drawS2Window(s2St.d); }
+    stepPartTint(s2Parts, s2St.pt, dt);
+  }
   function drawSUCycle(L, P, grow) {
     const f = P - Math.floor(P), seg = (a, b) => clamp01((f - a) / (b - a)), h = SU_E / 2;
     const g = grow(seg(0.04, 0.62)), open = ease(seg(0.72, 0.94));
@@ -1207,25 +1239,6 @@
     if (open <= 0.0005) drawSU(L.N, 0, 0, 0, 0, 0, 0, 0, 0);
     else { const x0 = SU_C[0] - SU_ES / 2, y0 = SU_C[1] - SU_ES / 2, zz = SU_C[2] + SU_ES / 2;
       drawSU(L.N, x0, x0 + SU_ES, y0, y0 + open * SU_ES, zz - 0.01, zz, smooth(open), 1, 0); }
-  }
-  scaleupCard.addEventListener('pointerenter', e => { su2St.hover = true; su2St.pt = suFig(e); });
-  scaleupCard.addEventListener('pointermove', e => { su2St.pt = suFig(e); });
-  scaleupCard.addEventListener('pointerleave', () => { su2St.hover = false; su2St.pt = null; });
-  const su2Parts = [su2.N, su2.W, su2.B].map(c => ({ layers: [c.layer], tint: c.stops, over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
-  function stepScaleUpV2(dt) {
-    const full = cfg.motion.speed / SU2_MS, on = su2St.hover || cfg.preview;
-    if (!on && (su2St.ret || su2St.vel > 0 || su2St.P % 1 !== 0)) {
-      // Return to rest: finish the cycle (it ends on its starting frame)
-      if (!su2St.ret) su2St.ret = startGlide(su2St.P, su2St.vel * full, full);
-      su2St.vel = ramp(su2St.vel, false, dt);
-      if (!su2St.ret.done) { glide(su2St.ret, dt); su2St.P = su2St.ret.x; renderScaleUpV2(); }
-      if (su2St.ret.done) { su2St.P = ((su2St.P % 1) + 1) % 1; renderScaleUpV2(); if (su2St.vel === 0) su2St.ret = null; }
-    } else {
-      if (su2St.ret) { su2St.ret = null; su2St.P = ((su2St.P % 1) + 1) % 1; }
-      su2St.vel = ramp(su2St.vel, on, dt);
-      if (su2St.vel > 0) { su2St.P = (su2St.P + dt * su2St.vel * full) % 1; renderScaleUpV2(); }
-    }
-    stepPartTint(su2Parts, su2St.pt, dt);
   }
   // ---------- v3s: static shapes; hovering a shape plays its move, leaving plays it back ----------
   // v3 moves answer the pointer right away: no start ramp, and curves that move most at the start
@@ -1690,9 +1703,10 @@
   // console handle for scrubbing the loop: __motion.seek(0..1)
   window.__motion = { seekScaleUp: v => { suP = v; renderScaleUp(); },
     seekV2: (key, v) => {
-      const st = key === 'merge' ? mvSt : key === 'scaleup' ? su2St : (key === 'slices' ? slicesV2 : depthV2).st;
+      if (key === 'scaleup') { s2St.d = v * S2_DEPTH; s2St.v = 0; renderScaleUpV2(); return; }   // v: 0 flat … 1 fully extruded
+      const st = key === 'merge' ? mvSt : (key === 'slices' ? slicesV2 : depthV2).st;
       Object.assign(st, { P: v, ret: null, vel: 0 });
-      if (key === 'merge') renderMergeV2(); else if (key === 'scaleup') renderScaleUpV2(); else (key === 'slices' ? slicesV2 : depthV2).render(); }, seekDepth: u => { dU = u; renderDepth(); }, seekMerge: t => { mT = t; renderMerge(); },
+      if (key === 'merge') renderMergeV2(); else (key === 'slices' ? slicesV2 : depthV2).render(); }, seekDepth: u => { dU = u; renderDepth(); }, seekMerge: t => { mT = t; renderMerge(); },
     // pose a spinning layer at an angle (degrees): __motion.spinAt('slices-layer-3', 45)
     spinAt: (id, deg) => { for (const h of HOVER) { const sp = h.byId[id]; if (sp && sp.spin) { sp.spin.a = sp.spin.target = deg * Math.PI / 180; if (deg % 90) sp.spin.draw(sp.layer.blur); else sp.spin.restore(sp.layer.blur); } } } };
 })();
