@@ -258,7 +258,7 @@
     motion: { speed: 1, curve: 'butter', bounce: 0, fade: 0.6, smoothing: 350 },
     look:   { blur: 5, colorize: false, outline: false, perCard: false, follow: false, spotR: 300, spotSoft: 1 },
     // each card's own parameters (its Customize parameters dropdown)
-    slices: { strength: 14, influence: 0.45, spin: 90, widen: 45 },
+    slices: { strength: 14, influence: 0.45, spin: 90, widen: 30 },
     depth:  { size: 130, hold: 0.3, spin: 90 },
     merge:  { impact: 18 },
     scaleup: { hold: 0.2, straight: false },
@@ -1257,33 +1257,77 @@
   const slicesV3 = makeGrowRow($('#card-slices'), 'slV3', SL_L, [SL_THIN, SL_THIN, SL_THICK, SL_THIN], 540, SL_THIN, SL_THICK);
   const depthV3 = makeGrowRow($('#card-depth'), 'dpV3', DV_L, [D_FIG_THICK, D_THIN, D_THIN], D_Y, D_THIN, D_FIG_THICK);
 
-  // ---------- 01 · Decide and 02 · Optimize (v1): Figma 8050:7894 ----------
+  // ---------- 01 · Decide: Figma 8050:7894 ----------
   // Four equal layers, 30 deep and 56 apart, that together make one perfect cube (338 → 738).
+  // The hovered layer widens to both sides around its own centre, and the layers on each side
+  // narrow by as much (split between them), so it stays in place and the cube keeps its size.
+  // An end layer has neighbours on one side only, so it widens toward them. One layer at a time,
+  // only on the shape under the pointer.
   const Q_L = [338.95, 394.95, 450.95, 506.95], Q_T = D_THIN, Q_N = Q_L.length;
   const v1Layer = (card, id) => mergeLayer(id, true, card);
-  // Decide: the hovered layer widens a little and the other three narrow to make room, so the
-  // cube keeps its size; only one layer is wide at a time (v3's hover rules)
-  const decideV1 = makeGrowRow($('#card-slices'), 'dc', Q_L, Q_L.map(() => Q_T), 540,
-    () => Q_T - cfg.slices.widen / (Q_N - 1), () => Q_T + cfg.slices.widen, v1Layer);
-  // Optimize: on hover the layers leave to the right one by one, last first (moving like v2's
-  // leaving slab: far out, narrowing, fading), while the first one, the base, deepens until it is
-  // the whole cube. Leaving plays it back. Each part runs on v2's speed curve.
+  const decideCard = $('#card-slices');
+  const dc = Q_L.map((_, i) => v1Layer(decideCard, 'dc' + i));
+  dc.forEach((c, i) => { c.layer.style.zIndex = 10 + i; });           // layers further right draw on top
+  const dcSt = { pt: null, hot: -1, cand: -1, since: 0, t: Q_L.map(() => Q_T), v: Q_L.map(() => 0), drawn: false };
+  decideCard.addEventListener('pointerenter', e => { dcSt.pt = figOf(decideCard, e); });
+  decideCard.addEventListener('pointermove', e => { dcSt.pt = figOf(decideCard, e); });
+  decideCard.addEventListener('pointerleave', () => { dcSt.pt = null; });
+  const dcTargets = hot => {
+    if (hot < 0) return Q_L.map(() => Q_T);
+    const G = cfg.slices.widen, left = hot, right = Q_N - 1 - hot;
+    const gl = !left ? 0 : !right ? G : G / 2, gr = G - gl;           // how much it takes from each side
+    return Q_L.map((_, i) => i === hot ? Q_T + G : i < hot ? Q_T - gl / left : Q_T - gr / right);
+  };
+  const decideV1 = {
+    render() {
+      let acc = 0;
+      dc.forEach((c, i) => { const t = Math.max(1, dcSt.t[i]); drawBox(c, Q_L[i] + acc + (D_S + t) / 2, 540, D_S, t, 0, 1); acc += dcSt.t[i] - Q_T; });
+      dcSt.drawn = true;
+    },
+    step(dt) {
+      let under = -1;
+      if (dcSt.pt) for (let i = Q_N - 1; i >= 0; i--) if (dc[i].poly && inPoly(dcSt.pt, dc[i].poly)) { under = i; break; }
+      if (under === dcSt.hot) dcSt.cand = under;
+      else if (under === -1 || dcSt.hot === -1) { dcSt.hot = under; dcSt.cand = under; }
+      else if (dcSt.cand !== under) { dcSt.cand = under; dcSt.since = 0; }
+      else if ((dcSt.since += dt) >= V3_SETTLE) dcSt.hot = under;
+      const tg = dcTargets(cfg.preview ? 1 : dcSt.hot);
+      const w = 2 * Math.PI * cfg.motion.speed / (CURVES[cfg.motion.curve].response * V3_SPRING), k = w * w, c = 2 * damping() * w;
+      const n = Math.max(1, Math.ceil(dt / 4)), hs = dt / 1000 / n;
+      let moved = !dcSt.drawn;
+      dcSt.t.forEach((t, i) => {
+        if (Math.abs(tg[i] - t) < 0.01 && Math.abs(dcSt.v[i]) < 0.01) { if (t !== tg[i]) { dcSt.t[i] = tg[i]; dcSt.v[i] = 0; moved = true; } return; }
+        if (reduceMotion.matches) { dcSt.t[i] = tg[i]; dcSt.v[i] = 0; }
+        else for (let j = 0; j < n; j++) { dcSt.v[i] += (k * (tg[i] - dcSt.t[i]) - c * dcSt.v[i]) * hs; dcSt.t[i] += dcSt.v[i] * hs; }
+        moved = true;
+      });
+      if (moved) decideV1.render();
+      stepPartTint(dcParts, dcSt.pt, dt);
+    },
+  };
+  const dcParts = [...dc].reverse().map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+
+  // ---------- 02 · Optimize: Figma 8050:7808 ----------
+  // A deeper base (60) and four thin layers (20, 35 apart) that together make one perfect cube.
+  const O_L = [338.95, 410.95, 445.95, 480.95, 515.95], O_T = [60, 20, 20, 20, 20], O_N = O_L.length;
+  // On hover the layers leave to the right one by one, last first (far out, narrowing, fading),
+  // while the base deepens until it is the whole cube; the layers still there are pushed along
+  // ahead of it. Leaving plays it back. Each part runs on the sharp-peak speed curve.
   const OPT_MS = 2400, OPT_FAR = 260, OPT_EDGE = 4;
   const optCard = $('#card-depth');
-  const opt = Q_L.map((_, i) => v1Layer(optCard, 'op' + i));
+  const opt = O_L.map((_, i) => v1Layer(optCard, 'op' + i));
   opt.forEach((c, i) => { c.layer.style.zIndex = 10 + i; });
   const optSt = { T: 0, pt: null, on: false };
   function renderOptimizeV1() {
     const T = optSt.T, seg = (a, b) => clamp01((T - a) / (b - a));
-    const tBase = lerp(Q_T, D_S, suEase(seg(0.04, 1)));                 // the base deepens to a cube
-    const leave = [null, suEase(seg(0.42, 0.9)), suEase(seg(0.22, 0.7)), suEase(seg(0, 0.48))];   // 4, then 3, then 2
-    let L = Q_L[0], t = tBase;
-    drawBox(opt[0], L + (D_S + t) / 2, 540, D_S, t, 0, 1);
-    for (let i = 1; i < Q_N; i++) {
-      L += (Q_L[i] - Q_L[i - 1]) + (t - Q_T);                            // pushed along by what's before it
-      const e = leave[i], ti = lerp(Q_T, OPT_EDGE, e), o = 1 - smooth(e);
+    const tBase = lerp(O_T[0], D_S, suEase(seg(0.04, 1)));              // the base deepens to a cube
+    // the last layer leaves first, then each one before it
+    const leave = [null, ...[3, 2, 1, 0].map(k => suEase(seg(k * 0.16, k * 0.16 + 0.42)))];
+    drawBox(opt[0], O_L[0] + (D_S + tBase) / 2, 540, D_S, tBase, 0, 1);
+    for (let i = 1; i < O_N; i++) {
+      const L = O_L[i] + (tBase - O_T[0]);                               // pushed along by the base
+      const e = leave[i], ti = lerp(O_T[i], OPT_EDGE, e), o = 1 - smooth(e);
       drawBox(opt[i], L + e * OPT_FAR + (D_S + ti) / 2, 540, D_S, ti, 0, o);
-      t = Q_T;
     }
   }
   optCard.addEventListener('pointerenter', e => { optSt.on = true; optSt.pt = figOf(optCard, e); });
@@ -1420,7 +1464,7 @@
 
   // version switch: an arrow on each side of the card steps through the versions; the title
   // says which alternative is showing
-  const VERSIONED = ['slices', 'depth', 'merge', 'scaleup'], N_VERSIONS = 3;
+  const VERSIONED = ['merge', 'scaleup'], N_VERSIONS = 3;   // 01 and 02 have no alternatives
   const VERSION_NAMES = { 2: ' (Alternative version)', 3: ' (Alternative version 2)' };
   const ARROW = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
   for (const key of VERSIONED) {
@@ -1440,6 +1484,8 @@
       tag.textContent = tag.dataset.base + (VERSION_NAMES[v] || '');
     }
   }
+
+  document.querySelectorAll('#card-slices > .layer.v2, #card-slices > .layer.v3, #card-depth > .layer.v2, #card-depth > .layer.v3').forEach(l => l.remove());
 
   // ---------- Follow pointer ----------
   // Every stroke near the pointer lights up, fading out by the Radius control, instead of the
@@ -1523,8 +1569,8 @@
   // a while after the last pointer or control input, long enough for any return-to-rest to land;
   // then it stops until the next input.
   const STEPS = {
-    slices: [dt => decideV1.step(dt), dt => slicesV2.step(dt), dt => slicesV3.step(dt)],
-    depth: [dt => stepOptimizeV1(dt), dt => depthV2.step(dt), dt => depthV3.step(dt)],
+    slices: [dt => decideV1.step(dt)],
+    depth: [dt => stepOptimizeV1(dt)],
     merge: [dt => stepMerge(dt), dt => stepMergeV2(dt), dt => stepMergeV3(dt)],
     scaleup: [dt => stepScaleUp(dt), dt => stepScaleUpV2(dt), dt => stepScaleUpV3(dt)],
   };
@@ -1533,7 +1579,7 @@
   let running = false, lastInput = 0;
   function tick(now) {
     const dt = Math.min(64, now - last); last = now;
-    for (const [key, steps] of Object.entries(STEPS)) steps[([2, 3].includes(cfg.versions[key]) ? cfg.versions[key] : 1) - 1](dt);
+    for (const [key, steps] of Object.entries(STEPS)) (steps[([2, 3].includes(cfg.versions[key]) ? cfg.versions[key] : 1) - 1] || steps[0])(dt);
     stepFollow(dt);
     if (hoveredCards.size || cfg.preview || now - lastInput < IDLE_MS / Math.min(1, cfg.motion.speed)) requestAnimationFrame(tick);
     else running = false;
@@ -1590,8 +1636,8 @@
   // Spin: how far each hover turns the layer, in quarter turns (90° steps), up to two full turns
   const SPIN = { k: 'spin', label: 'Spin', min: 0, max: 720, step: 90, fmt: deg };
   const CARD_PARAMS = {
-    slices: { note: 'The hovered layer widens and the others narrow to make room; the cube keeps its size. Widen: how much deeper the hovered layer gets.', fields: [
-      { k: 'widen', label: 'Widen', min: 0, max: 80, step: 1, fmt: px }] },
+    slices: { note: 'The hovered layer widens to both sides and the layers around it narrow to make room; the cube keeps its size. Widen: how much wider the hovered layer gets.', fields: [
+      { k: 'widen', label: 'Widen', min: 0, max: 70, step: 1, fmt: px }] },
     merge:  { note: 'Two slabs collide and fuse into one cube; the seam between them zips shut behind a spark. On leave it plays back. Impact: how hard the block rings when they hit.', fields: [
       { k: 'impact', label: 'Impact', min: 0, max: 60, step: 1, fmt: px }] },
     scaleup: { note: 'A window opens in the back wall, extrudes into a small cube, and grows into the new cube while the old one fades. Pause: how long it holds at the end of each cycle. The cube lies on its side (as in Figma 7907:5126) in this version and the first alternative; Straight stands it upright.', fields: [
@@ -1620,7 +1666,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderMerge(); renderScaleUp(); decideV1.render(); renderOptimizeV1(); slicesV2.render(); depthV2.render(); renderMergeV2(); renderScaleUpV2(); slicesV3.render(); depthV3.render(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderMerge(); renderScaleUp(); decideV1.render(); renderOptimizeV1(); renderMergeV2(); renderScaleUpV2(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
   function fieldRow(f, obj, id) {

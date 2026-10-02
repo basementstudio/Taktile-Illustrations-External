@@ -6,14 +6,14 @@ Published preview: https://claude.ai/artifact/Uuheq1CujWzzWozDJxCH86
 
 Four animations:
 
-1. **Decide** (Figma 8050:7894): four equal layers that make one cube; the hovered layer widens and the others narrow to make room
-2. **Optimize** (same frame): on hover the layers leave to the right one by one while the base deepens into the whole cube; leaving plays it back
+1. **Decide** (Figma 8050:7894): four equal layers that make one cube; the hovered layer widens to both sides and the layers around it narrow, so the cube keeps its size
+2. **Optimize** (Figma 8050:7808): a deeper base and four thin layers; on hover the layers leave to the right one by one while the base deepens into the whole cube; leaving plays it back
 3. **Connect**: two slabs collide and fuse into one cube; the seam zips shut behind a spark
 4. **Scale** (loop): rests on the cube with a window open; the window extrudes into a small cube that grows into the new cube, and a new window opens
 
 All cards are drawn procedurally from the Figma frames' geometry. Inner edges are solid lines (#353232 dark, #9A9797 light).
 
-Every card also has an **alternative version**: the arrows on each side of the card switch to it, and its title then ends in "(Alternative version)".
+03 and 04 also have an **alternative version**: the arrows on each side of the card switch to it, and its title then ends in "(Alternative version)".
 
 - 01: a conveyor; on hover the last slab slides out right as a new one fades in from the left, and the slab in the third slot is always the thick one
 - 02: the same conveyor with the first slot always thick
