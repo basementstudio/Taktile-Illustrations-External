@@ -82,6 +82,9 @@
   :root.follow .card stop[stop-color="#353232"] { stop-color: color-mix(in srgb, var(--tint, var(--inner-hot)) calc(var(--fhot, 0) * 100%), var(--inner)); }
   :root.follow .card [stroke="#FDFCFC"] { stroke: var(--spot, var(--line)); }
   .card .spot stop { stop-color: color-mix(in srgb, var(--otint, var(--line)) calc(var(--pres, 0) * var(--w) * 100%), var(--line)); }
+  /* inner edges are solid lines (#353232 dark / #9A9797 light): every stop of their gradients is
+     fully opaque, whatever opacities the drawing code or the Figma export give them */
+  .card stop[stop-color="#353232"] { stop-opacity: 1 !important; }
   /* stroke and stop colors are driven every frame by the hover/loop motion (--hot), so they get
      no CSS transition: one would lag the highlight behind the movement */
   .card path, .card rect { transition: fill .3s; }
@@ -221,69 +224,7 @@
     </header>
     <div class="grid">
       <div class="card" id="card-slices"><div class="tag">01 · Decide</div>
-        <svg class="src" viewBox="0 0 1080 1080" fill="none" xmlns="http://www.w3.org/2000/svg">
-<g id="slices-base">
-<path id="slices-union" d="M400.712 712.5L371.289 712.5L271.577 540L371.289 367.5L400.712 367.5L500.369 540L400.712 712.5Z" fill="#0B0A0A" fill-opacity="0.5" stroke="#FDFCFC"/>
-<path id="slices-vector-5868" d="M401 367L301 540L401 713" stroke="url(#slices-paint0-linear-7169-5641)"/>
-<path id="slices-vector-5869" d="M300.945 540L271.945 540" stroke="url(#slices-paint1-linear-7169-5641)"/>
-</g>
-<g id="slices-layer-2">
-<path id="slices-union-2" d="M510.235 712.5L480.812 712.5L381.101 540L480.812 367.5L510.235 367.5L609.893 540L510.235 712.5Z" fill="#0B0A0A" fill-opacity="0.5" stroke="#FDFCFC"/>
-<path id="slices-vector-5868-2" d="M510.523 367L410.523 540L510.523 713" stroke="url(#slices-paint2-linear-7169-5641)"/>
-<path id="slices-vector-5869-2" d="M410.469 540L381.469 540" stroke="url(#slices-paint3-linear-7169-5641)"/>
-</g>
-<g id="slices-layer-3">
-<path id="slices-union-3" d="M660.243 712.5L530.82 712.5L431.108 540L530.82 367.5L660.243 367.5L759.9 540L660.243 712.5Z" fill="#0B0A0A" fill-opacity="0.51" stroke="#FDFCFC"/>
-<path id="slices-vector-5868-3" d="M660.008 367L560.008 540L660.008 713" stroke="url(#slices-paint4-linear-7169-5641)"/>
-<path id="slices-vector-5870" d="M560.008 540L431.477 540" stroke="url(#slices-paint5-linear-7169-5641)"/>
-</g>
-<g id="slices-layer-4">
-<path id="slices-union-4" d="M709.665 712.973L680.242 712.973L580.53 540.473L680.242 367.973L709.665 367.973L809.322 540.473L709.665 712.973Z" fill="#0B0A0A" fill-opacity="0.5" stroke="#FDFCFC"/>
-<path id="slices-vector-5868-4" d="M709.953 367.473L609.953 540.473L709.953 713.473" stroke="url(#slices-paint6-linear-7169-5641)"/>
-<path id="slices-vector-5869-3" d="M609.898 540.473L580.898 540.473" stroke="url(#slices-paint7-linear-7169-5641)"/>
-</g>
-<defs>
-<linearGradient id="slices-paint0-linear-7169-5641" x1="301" y1="713" x2="301" y2="367" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232" stop-opacity="0"/>
-<stop offset="0.25" stop-color="#353232"/>
-<stop offset="0.75" stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="slices-paint1-linear-7169-5641" x1="301" y1="540" x2="271.945" y2="540" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="slices-paint2-linear-7169-5641" x1="410.523" y1="713" x2="410.523" y2="367" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232" stop-opacity="0"/>
-<stop offset="0.25" stop-color="#353232"/>
-<stop offset="0.75" stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="slices-paint3-linear-7169-5641" x1="410.523" y1="540" x2="381.469" y2="540" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="slices-paint4-linear-7169-5641" x1="560.008" y1="713" x2="560.008" y2="367" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232" stop-opacity="0"/>
-<stop offset="0.25" stop-color="#353232"/>
-<stop offset="0.75" stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="slices-paint5-linear-7169-5641" x1="560.008" y1="4324.26" x2="431.477" y2="4324.26" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="slices-paint6-linear-7169-5641" x1="609.953" y1="713.473" x2="609.953" y2="367.473" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232" stop-opacity="0"/>
-<stop offset="0.25" stop-color="#353232"/>
-<stop offset="0.75" stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-<linearGradient id="slices-paint7-linear-7169-5641" x1="609.953" y1="540.473" x2="580.898" y2="540.473" gradientUnits="userSpaceOnUse">
-<stop stop-color="#353232"/>
-<stop offset="1" stop-color="#353232" stop-opacity="0"/>
-</linearGradient>
-</defs></svg></div>
+</div>
       <div class="card" id="card-depth"><div class="tag">02 · Optimize</div></div>
       <div class="card" id="card-merge"><div class="tag">03 · Connect</div></div>
       <div class="card" id="card-scaleup"><div class="tag">04 · Scale</div></div>
@@ -317,7 +258,7 @@
     motion: { speed: 1, curve: 'butter', bounce: 0, fade: 0.6, smoothing: 350 },
     look:   { blur: 5, colorize: false, outline: false, perCard: false, follow: false, spotR: 300, spotSoft: 1 },
     // each card's own parameters (its Customize parameters dropdown)
-    slices: { strength: 14, influence: 0.45, spin: 90 },
+    slices: { strength: 14, influence: 0.45, spin: 90, widen: 45 },
     depth:  { size: 130, hold: 0.3, spin: 90 },
     merge:  { impact: 18 },
     scaleup: { hold: 0.2, straight: false },
@@ -449,15 +390,13 @@
     card.appendChild(hits);
   }
 
-  ['#card-slices'].forEach(s => explode($(s)));
+
 
   // ---------- per-layer hover (01, 02, 04) ----------
   // Every moving layer follows its own spring. Its target is how "hovered" it is: the layer
   // under the cursor gets 1; with influence > 0, every other layer also gets a share that
   // fades smoothly with the cursor's distance from its centre.
   const HOVER = [
-    // 01 (the old 04) is a stack drawn a quarter turn round on screen, so its turn reads as upward
-    { card: '#card-slices', key: 'slices', dir: 'right', moveBase: true, spinBox: true, screenRot: true, spinSign: -1, order: ['slices-base', 'slices-layer-2', 'slices-layer-3', 'slices-layer-4'] },
   ].map(h => ({ ...h, card: $(h.card), p: null, hit: null, u: 1 }));
   // bases stay put (they block what's behind them), except where a card lets its base move too
   const isFixed = (h, id) => (id.endsWith('-base') && !h.moveBase) || (h.fixed || []).includes(id);
@@ -748,7 +687,7 @@
   const DEPTH_STEP_MS = 1500;                  // one hand-off plus its pause, at speed 1×
   const depthCard = $('#card-depth');
   const D_THIN = 29.945, D_FIG_THICK = 129.945, D_GAPS = [79.5, 99.5], D_LEFT = 216, D_Y = 540.47, D_H = 173;
-  const depthSlabs = [0, 1, 2].map(i => {
+  const depthSlabs = [0, 1, 2].map(i => {   // the former 02 v1 (no longer shown: detached below)
     const layer = document.createElement('div');
     layer.className = 'layer';
     const blur = document.createElement('div');
@@ -766,6 +705,7 @@
     return { layer, blur, svg, lines: [...svg.querySelectorAll('line')], grads, stops: grads.map(g => [...g.querySelectorAll('stop')]),
       outline: svg.querySelector('path'), poly: null, key: null, L: 0, t: D_THIN, a: 0, av: 0, target: 0 };
   });
+  depthSlabs.forEach(c => c.layer.remove());
   // A slab is a box turned a quarter on screen (like 04): worked out upright with a square
   // D_S × D_S cross-section and height t, then turned back so its height runs left to right.
   // Turning on its own axis spins the square face in place, so every quarter turn looks the same.
@@ -1279,8 +1219,9 @@
   // stays centred. The hovered slab is the topmost shape actually under the pointer; a switch to
   // another one waits until the pointer has been on it for a moment, so the reflow can't flicker.
   const V3_SETTLE = 90;   // ms the pointer must stay on another slab before it takes over
-  function makeGrowRow(card, id, L, T, Y, thin, thick) {
-    const slabs = L.map((_, i) => v3Layer(card, id + i));
+  function makeGrowRow(card, id, L, T, Y, thin, thick, mk = v3Layer) {
+    const val = x => typeof x === 'function' ? x() : x;
+    const slabs = L.map((_, i) => mk(card, id + i));
     slabs.forEach((c, i) => { c.layer.style.zIndex = 10 + i; });     // slabs further right draw on top
     const st = { pt: null, hot: -1, cand: -1, since: 0, t: T.slice(), v: T.map(() => 0), drawn: false };
     card.addEventListener('pointerenter', e => { st.pt = figOf(card, e); });
@@ -1302,7 +1243,7 @@
       const n = Math.max(1, Math.ceil(dt / 4)), hs = dt / 1000 / n;
       let moved = !st.drawn;
       st.t.forEach((t, i) => {
-        const target = st.hot < 0 ? T[i] : i === st.hot ? thick : thin;
+        const target = st.hot < 0 ? T[i] : i === st.hot ? val(thick) : val(thin);
         if (Math.abs(target - t) < 0.01 && Math.abs(st.v[i]) < 0.01) { if (t !== target) { st.t[i] = target; st.v[i] = 0; moved = true; } return; }
         if (reduceMotion.matches) { st.t[i] = target; st.v[i] = 0; }
         else for (let j = 0; j < n; j++) { st.v[i] += (k * (target - st.t[i]) - c * st.v[i]) * hs; st.t[i] += st.v[i] * hs; }
@@ -1315,6 +1256,46 @@
   }
   const slicesV3 = makeGrowRow($('#card-slices'), 'slV3', SL_L, [SL_THIN, SL_THIN, SL_THICK, SL_THIN], 540, SL_THIN, SL_THICK);
   const depthV3 = makeGrowRow($('#card-depth'), 'dpV3', DV_L, [D_FIG_THICK, D_THIN, D_THIN], D_Y, D_THIN, D_FIG_THICK);
+
+  // ---------- 01 · Decide and 02 · Optimize (v1): Figma 8050:7894 ----------
+  // Four equal layers, 30 deep and 56 apart, that together make one perfect cube (338 → 738).
+  const Q_L = [338.95, 394.95, 450.95, 506.95], Q_T = D_THIN, Q_N = Q_L.length;
+  const v1Layer = (card, id) => mergeLayer(id, true, card);
+  // Decide: the hovered layer widens a little and the other three narrow to make room, so the
+  // cube keeps its size; only one layer is wide at a time (v3's hover rules)
+  const decideV1 = makeGrowRow($('#card-slices'), 'dc', Q_L, Q_L.map(() => Q_T), 540,
+    () => Q_T - cfg.slices.widen / (Q_N - 1), () => Q_T + cfg.slices.widen, v1Layer);
+  // Optimize: on hover the layers leave to the right one by one, last first (moving like v2's
+  // leaving slab: far out, narrowing, fading), while the first one, the base, deepens until it is
+  // the whole cube. Leaving plays it back. Each part runs on v2's speed curve.
+  const OPT_MS = 2400, OPT_FAR = 260, OPT_EDGE = 4;
+  const optCard = $('#card-depth');
+  const opt = Q_L.map((_, i) => v1Layer(optCard, 'op' + i));
+  opt.forEach((c, i) => { c.layer.style.zIndex = 10 + i; });
+  const optSt = { T: 0, pt: null, on: false };
+  function renderOptimizeV1() {
+    const T = optSt.T, seg = (a, b) => clamp01((T - a) / (b - a));
+    const tBase = lerp(Q_T, D_S, suEase(seg(0.04, 1)));                 // the base deepens to a cube
+    const leave = [null, suEase(seg(0.42, 0.9)), suEase(seg(0.22, 0.7)), suEase(seg(0, 0.48))];   // 4, then 3, then 2
+    let L = Q_L[0], t = tBase;
+    drawBox(opt[0], L + (D_S + t) / 2, 540, D_S, t, 0, 1);
+    for (let i = 1; i < Q_N; i++) {
+      L += (Q_L[i] - Q_L[i - 1]) + (t - Q_T);                            // pushed along by what's before it
+      const e = leave[i], ti = lerp(Q_T, OPT_EDGE, e), o = 1 - smooth(e);
+      drawBox(opt[i], L + e * OPT_FAR + (D_S + ti) / 2, 540, D_S, ti, 0, o);
+      t = Q_T;
+    }
+  }
+  optCard.addEventListener('pointerenter', e => { optSt.on = true; optSt.pt = figOf(optCard, e); });
+  optCard.addEventListener('pointermove', e => { optSt.pt = figOf(optCard, e); });
+  optCard.addEventListener('pointerleave', () => { optSt.on = false; optSt.pt = null; });
+  const optParts = [...opt].reverse().map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  function stepOptimizeV1(dt) {
+    const to = optSt.on || cfg.preview ? 1 : 0, was = optSt.T;
+    optSt.T = reduceMotion.matches ? to : to > optSt.T ? Math.min(1, optSt.T + dt * cfg.motion.speed / OPT_MS) : Math.max(0, optSt.T - dt * cfg.motion.speed / OPT_MS);
+    if (optSt.T !== was) renderOptimizeV1();
+    stepPartTint(optParts, optSt.pt, dt);
+  }
   // 03 v3: the two slabs stay put. Hovering the thick one plays v1's collision (it grows into the
   // thin one); hovering the thin one plays it the other way round: the thin one widens to the
   // left while the thick one thins, and they meet and seal into the same cube. Off the shapes, it plays back.
@@ -1542,8 +1523,8 @@
   // a while after the last pointer or control input, long enough for any return-to-rest to land;
   // then it stops until the next input.
   const STEPS = {
-    slices: [dt => stepHover(dt), dt => slicesV2.step(dt), dt => slicesV3.step(dt)],
-    depth: [dt => stepDepth(dt), dt => depthV2.step(dt), dt => depthV3.step(dt)],
+    slices: [dt => decideV1.step(dt), dt => slicesV2.step(dt), dt => slicesV3.step(dt)],
+    depth: [dt => stepOptimizeV1(dt), dt => depthV2.step(dt), dt => depthV3.step(dt)],
     merge: [dt => stepMerge(dt), dt => stepMergeV2(dt), dt => stepMergeV3(dt)],
     scaleup: [dt => stepScaleUp(dt), dt => stepScaleUpV2(dt), dt => stepScaleUpV3(dt)],
   };
@@ -1609,10 +1590,8 @@
   // Spin: how far each hover turns the layer, in quarter turns (90° steps), up to two full turns
   const SPIN = { k: 'spin', label: 'Spin', min: 0, max: 720, step: 90, fmt: deg };
   const CARD_PARAMS = {
-    slices: { note: 'Influence spreads the hover to nearby layers; Spin turns the hovered slice upward, in 90° steps.', fields: [...LIFT, SPIN] },
-    depth:  { note: 'On hover the thick slab hands its depth along to the last one and stays; on leave it goes straight back to the first. Depth: how thick it gets; Pause: how long it holds between hand-offs; Spin turns the hovered slab upward, in 90° steps.', fields: [
-      { k: 'size', label: 'Depth', min: 60, max: 260, step: 2, fmt: px },
-      { k: 'hold', label: 'Pause', min: 0, max: 0.7, step: 0.01, fmt: pct }, SPIN] },
+    slices: { note: 'The hovered layer widens and the others narrow to make room; the cube keeps its size. Widen: how much deeper the hovered layer gets.', fields: [
+      { k: 'widen', label: 'Widen', min: 0, max: 80, step: 1, fmt: px }] },
     merge:  { note: 'Two slabs collide and fuse into one cube; the seam between them zips shut behind a spark. On leave it plays back. Impact: how hard the block rings when they hit.', fields: [
       { k: 'impact', label: 'Impact', min: 0, max: 60, step: 1, fmt: px }] },
     scaleup: { note: 'A window opens in the back wall, extrudes into a small cube, and grows into the new cube while the old one fades. Pause: how long it holds at the end of each cycle. The cube lies on its side (as in Figma 7907:5126) in this version and the first alternative; Straight stands it upright.', fields: [
@@ -1641,7 +1620,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderDepth(); renderMerge(); renderScaleUp(); slicesV2.render(); depthV2.render(); renderMergeV2(); renderScaleUpV2(); slicesV3.render(); depthV3.render(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderMerge(); renderScaleUp(); decideV1.render(); renderOptimizeV1(); slicesV2.render(); depthV2.render(); renderMergeV2(); renderScaleUpV2(); slicesV3.render(); depthV3.render(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
   function fieldRow(f, obj, id) {

@@ -6,12 +6,12 @@ Published preview: https://claude.ai/artifact/Uuheq1CujWzzWozDJxCH86
 
 Four animations:
 
-1. **Decide**: slices slide right (from the Figma export in `src/i5.svg`)
-2. **Optimize**: the thick slab hands its depth along on hover and hands it back on leave
+1. **Decide** (Figma 8050:7894): four equal layers that make one cube; the hovered layer widens and the others narrow to make room
+2. **Optimize** (same frame): on hover the layers leave to the right one by one while the base deepens into the whole cube; leaving plays it back
 3. **Connect**: two slabs collide and fuse into one cube; the seam zips shut behind a spark
 4. **Scale** (loop): rests on the cube with a window open; the window extrudes into a small cube that grows into the new cube, and a new window opens
 
-Cards 2–4 are drawn procedurally from the Figma frames' geometry.
+All cards are drawn procedurally from the Figma frames' geometry. Inner edges are solid lines (#353232 dark, #9A9797 light).
 
 Every card also has an **alternative version**: the arrows on each side of the card switch to it, and its title then ends in "(Alternative version)".
 
@@ -43,8 +43,7 @@ The page is set in Söhne (Klim Type Foundry), a licensed font that isn't bundle
 
 - `index.html` — the built page (published as the artifact). Don't edit by hand.
 - `src/template.html` — page source: styles, markup and all animation code.
-- `src/build.mjs` — injects the Figma SVG exports into the template and writes `index.html`.
-- `src/i5.svg` — raw SVG export of the Figma frame for 01.
+- `src/build.mjs` — writes `index.html` from the template.
 - `serve.mjs` — local preview server (wraps the page the way the artifact host does).
 
 ## Build and preview

@@ -34,9 +34,7 @@ function extract(file, prefix) {
   return all;
 }
 
-const i5 = extract('i5.svg', 'slices');   // 01 · Slices (the other cards are drawn procedurally)
 
 let html = fs.readFileSync(path.join(dir, 'template.html'), 'utf8');
-html = html.replace('{{SLICES}}', i5);
 fs.writeFileSync(out, html);
 console.log('wrote', out, html.length, 'bytes');
