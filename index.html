@@ -844,7 +844,8 @@
     const faceZ = (b, sign) => { const n = [0, 0, 0]; n[b] = sign ? 1 : -1; return view(n)[2]; };
     c.poly = hull(S);
     c.vis = o;
-    setS(c.layer, 'visibility', Math.max(o, lineO) <= 0.001 ? 'hidden' : '');
+    // fully faded layers leave the render tree: a hidden blur pane can still composite a faint ghost line
+    setS(c.layer, 'display', Math.max(o, lineO) <= 0.001 ? 'none' : '');
     if (Math.max(o, lineO) <= 0.001) return;                          // hidden: nothing else to draw
     c.lines.forEach((ln, k) => {
       const [i, j, ax] = SPIN_EDGES[k];
@@ -992,7 +993,7 @@
   function drawSU(c, x0, x1, y0, y1, z0, z1, paneO, lineO, edgeO = 1) {
     const f = n => n.toFixed(2);
     c.vis = lineO;
-    setS(c.layer, 'visibility', Math.max(paneO, lineO) <= 0.001 ? 'hidden' : '');
+    setS(c.layer, 'display', Math.max(paneO, lineO) <= 0.001 ? 'none' : '');
     if (Math.max(paneO, lineO) <= 0.001) return;
     const S = [];
     for (const X of [x0, x1]) for (const Y of [y0, y1]) for (const Z of [z0, z1]) S.push(suProj([X, Y, Z]));
@@ -1387,12 +1388,16 @@
       // the cube (the slab is eaten from that side), and its pane and lines fade over the band
       // the edge sweeps across it (from UN_BAND before it to UN_BAND past it), so a slab is gone
       // just as the edge leaves it behind, thin ones included.
+      // The band never reaches past where the edge stops (the cube's own face), so even the last
+      // slab is fully gone when the cube is: otherwise its line would linger beside the cube's.
       const ahead = j > src, edge = ahead ? hi : lo;
-      const a = ahead ? clamp01((edge - (O_L[j] - UN_BAND)) / (O_T[j] + 2 * UN_BAND))
-                      : clamp01(((R[j] + UN_BAND) - edge) / (O_T[j] + 2 * UN_BAND));
+      const a = ahead ? clamp01((edge - (O_L[j] - UN_BAND)) / (Math.min(R[j] + UN_BAND, CUBE) - (O_L[j] - UN_BAND)))
+                      : clamp01(((R[j] + UN_BAND) - edge) / ((R[j] + UN_BAND) - Math.max(O_L[j] - UN_BAND, L0)));
       const o = 1 - smooth(a);
       if (o <= 0.001) { drawBox(un[j], 540, 540, D_S, 1, 0, 0, 0); continue; }
-      const l = ahead ? Math.min(R[j], Math.max(O_L[j], edge)) : O_L[j], r = ahead ? R[j] : Math.max(O_L[j], Math.min(R[j], edge));
+      // what is left of it sits against the edge; once the edge is past it, it travels with the
+      // edge, so its last line lies exactly on the cube's and never runs beside it as a double
+      const l = ahead ? Math.max(O_L[j], edge) : O_L[j], r = ahead ? Math.max(R[j], edge) : Math.max(O_L[j], Math.min(R[j], edge));
       const t = Math.max(0.5, r - l);
       drawBox(un[j], l + (D_S + t) / 2, 540, D_S, t, 0, o, o);
     }
@@ -1516,7 +1521,7 @@
   // an axis-aligned box in the cube's frame; inner edges from the corner nearest the viewer
   function drawS2Box(c, [x0, x1], [y0, y1], [z0, z1], edgeO) {
     const f = n => n.toFixed(2);
-    c.vis = 1; setS(c.layer, 'visibility', '');
+    c.vis = 1; setS(c.layer, 'display', '');
     const S = [];
     for (const X of [x0, x1]) for (const Y of [y0, y1]) for (const Z of [z0, z1]) S.push(s2Proj([X, Y, Z]));
     const front = s2Proj([x1, y1, z1]), ends = [[x0, y1, z1], [x1, y0, z1], [x1, y1, z0]].map(s2Proj);
@@ -1553,7 +1558,7 @@
 
   // version switch: an arrow on each side of the card steps through the versions; the title
   // says which alternative is showing
-  const VERSIONED = ['merge', 'scaleup'], N_VERSIONS = 3;   // 01 and 02 have no alternatives
+  const VERSIONED = [], N_VERSIONS = 3;   // 03 keeps only its first version and 04 only its second: no arrows
   const VERSION_NAMES = { 2: ' (Alternative version)', 3: ' (Alternative version 2)' };
   const ARROW = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
   for (const key of VERSIONED) {
@@ -1576,6 +1581,8 @@
 
   document.querySelectorAll('#card-slices > .layer.v2, #card-slices > .layer.v3, #card-depth > .layer.v2, #card-depth > .layer.v3').forEach(l => l.remove());
   opt.forEach(c => c.layer.classList.add('v2'));                    // 02 v2's layers (after the old conveyors are cleared)
+  document.querySelectorAll('#card-merge > .layer.v2, #card-merge > .layer.v3, #card-scaleup > .layer:not(.v2)').forEach(l => l.remove());
+  $('#card-scaleup').dataset.v = 2;
 
   // ---------- Follow pointer ----------
   // Every stroke near the pointer lights up, fading out by the Radius control, instead of the
@@ -1661,15 +1668,15 @@
   const STEPS = {
     slices: [dt => decideV1.step(dt)],
     depth: [dt => (depthVer() === 2 ? stepOptimizeV1 : stepUnify)(dt)],
-    merge: [dt => stepMerge(dt), dt => stepMergeV2(dt), dt => stepMergeV3(dt)],
-    scaleup: [dt => stepScaleUp(dt), dt => stepScaleUpV2(dt), dt => stepScaleUpV3(dt)],
+    merge: [dt => stepMerge(dt)],
+    scaleup: [dt => stepScaleUpV2(dt)],
   };
   const IDLE_MS = 9000;
   const hoveredCards = new Set();
   let running = false, lastInput = 0;
   function tick(now) {
     const dt = Math.min(64, now - last); last = now;
-    for (const [key, steps] of Object.entries(STEPS)) (steps[([2, 3].includes(cfg.versions[key]) ? cfg.versions[key] : 1) - 1] || steps[0])(dt);
+    for (const steps of Object.values(STEPS)) steps[0](dt);
     stepFollow(dt);
     if (hoveredCards.size || cfg.preview || now - lastInput < IDLE_MS / Math.min(1, cfg.motion.speed)) requestAnimationFrame(tick);
     else running = false;
@@ -1732,8 +1739,7 @@
       { k: 'brand', type: 'check', label: 'Use brand icon' }] },
     merge:  { note: 'Two slabs collide and fuse into one cube; the seam between them zips shut behind a spark. On leave it plays back. Impact: how hard the block rings when they hit.', fields: [
       { k: 'impact', label: 'Impact', min: 0, max: 60, step: 1, fmt: px }] },
-    scaleup: { note: 'A window opens in the back wall, extrudes into a small cube, and grows into the new cube while the old one fades. Pause: how long it holds at the end of each cycle. The cube lies on its side (as in Figma 7907:5126) in this version and the first alternative; Straight stands it upright.', fields: [
-      { k: 'hold', label: 'Pause', min: 0, max: 0.6, step: 0.01, fmt: pct },
+    scaleup: { note: 'The window scales up and extrudes into the big cube while the old one flattens away; then a new window opens. The cube lies on its side (as in Figma 7907:5126); Straight stands it upright.', fields: [
       { k: 'straight', type: 'check', label: 'Straight cube (upright)' }] },
   };
 
@@ -1758,7 +1764,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderMerge(); renderScaleUp(); decideV1.render(); renderOptimizeV1(); renderUnify(); applyDepthVersion(); renderMergeV2(); renderScaleUpV2(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderMerge(); decideV1.render(); renderOptimizeV1(); renderUnify(); applyDepthVersion(); renderScaleUpV2(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
   function fieldRow(f, obj, id) {
