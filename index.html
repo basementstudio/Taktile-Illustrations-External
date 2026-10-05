@@ -259,7 +259,7 @@
     look:   { blur: 5, colorize: false, outline: false, perCard: false, follow: false, spotR: 300, spotSoft: 1 },
     // each card's own parameters (its Customize parameters dropdown)
     slices: { strength: 14, influence: 0.45, spin: 90, widen: 30 },
-    depth:  { size: 130, hold: 0.3, spin: 90 },
+    depth:  { size: 130, hold: 0.3, spin: 90, brand: false, v: 1 },
     merge:  { impact: 18 },
     scaleup: { hold: 0.2, straight: false },
     layout: { cols: 2 },
@@ -1307,26 +1307,42 @@
   };
   const dcParts = [...dc].reverse().map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
 
-  // ---------- 02 · Optimize: Figma 8050:7808 ----------
+  // 02 · Optimize: ported from tomasv912/Taktile-Claude-Illustrations (claude/determined-wright-tb6swz)
+  // ---------- 02 · Optimize v2: Figma 8050:7808 (v1, the base absorbing the layers, is further down) ----------
   // A deeper base (60) and four thin layers (20, 35 apart) that together make one perfect cube.
-  const O_L = [338.95, 410.95, 445.95, 480.95, 515.95], O_T = [60, 20, 20, 20, 20], O_N = O_L.length;
+  // Use brand icon (Figma 8050:8025) swaps in the brand icon's layers: a base 34 deep, then
+  // layers 12, 5, 2 and 2 deep that spread further apart toward the right. Same move, same curve.
+  const O_SETS = {
+    layers: { L: [338.95, 410.95, 445.95, 480.95, 515.95], T: [60, 20, 20, 20, 20] },
+    brand:  { L: [338.95, 382.95, 410.95, 446.95, 507.95], T: [34, 12, 5, 2, 2] },
+  };
+  const O_N = 5;
+  const optSet = () => O_SETS[cfg.depth.brand ? 'brand' : 'layers'];
   // On hover the layers leave to the right one by one, last first (far out, narrowing, fading),
   // while the base deepens until it is the whole cube; the layers still there are pushed along
-  // ahead of it. Leaving plays it back. Each part runs on the sharp-peak speed curve.
-  const OPT_MS = 2400, OPT_FAR = 260, OPT_EDGE = 4;
+  // ahead of it. Leaving plays it back. Everything runs off one master curve, so the moves share
+  // one speed profile: the base spans the whole move, the layers leave on equal, evenly staggered
+  // windows of it, and the last one finishes exactly as the base becomes the cube.
+  // The master curve is 04's: the window's grow curve (a sharp speed peak, slow at both ends) over
+  // 04's grow time, for the base and the layers alike. Connect's driver plays it (back on leave,
+  // its play speed eased by Start/stop).
+  const OPT_FAR = 260, OPT_EDGE = 4;
+  const OPT_WIN = 0.55, OPT_STAGGER = (1 - OPT_WIN) / 3;               // 4 layers: 3 staggers + 1 window = 1
   const optCard = $('#card-depth');
-  const opt = O_L.map((_, i) => v1Layer(optCard, 'op' + i));
+  const opt = O_SETS.layers.L.map((_, i) => v1Layer(optCard, 'op' + i));
   opt.forEach((c, i) => { c.layer.style.zIndex = 10 + i; });
-  const optSt = { T: 0, pt: null, on: false };
+  const optSt = { T: 0, V: 0, pt: null, on: false };
+  const optMs = () => SU2_MS * (0.62 - 0.04);                          // 04's grow time
+  const sine = t => 0.5 - 0.5 * Math.cos(Math.PI * clamp01(t));
   function renderOptimizeV1() {
-    const T = optSt.T, seg = (a, b) => clamp01((T - a) / (b - a));
-    const tBase = lerp(O_T[0], D_S, suEase(seg(0.04, 1)));              // the base deepens to a cube
-    // the last layer leaves first, then each one before it
-    const leave = [null, ...[3, 2, 1, 0].map(k => suEase(seg(k * 0.16, k * 0.16 + 0.42)))];
+    const { L: O_L, T: O_T } = optSet();
+    const u = suEase(optSt.T), tBase = lerp(O_T[0], D_S, u);              // 04's grow curve for everything
+    // the last layer leaves first, then each one before it, all on the same curve
+    const leave = [null, ...[3, 2, 1, 0].map(j => sine((u - j * OPT_STAGGER) / OPT_WIN))];
     drawBox(opt[0], O_L[0] + (D_S + tBase) / 2, 540, D_S, tBase, 0, 1);
     for (let i = 1; i < O_N; i++) {
       const L = O_L[i] + (tBase - O_T[0]);                               // pushed along by the base
-      const e = leave[i], ti = lerp(O_T[i], OPT_EDGE, e), o = 1 - smooth(e);
+      const e = leave[i], ti = lerp(O_T[i], Math.min(OPT_EDGE, O_T[i]), e), o = 1 - e;      // move, narrow and fade together
       drawBox(opt[i], L + e * OPT_FAR + (D_S + ti) / 2, 540, D_S, ti, 0, o);
     }
   }
@@ -1335,11 +1351,84 @@
   optCard.addEventListener('pointerleave', () => { optSt.on = false; optSt.pt = null; });
   const optParts = [...opt].reverse().map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
   function stepOptimizeV1(dt) {
-    const to = optSt.on || cfg.preview ? 1 : 0, was = optSt.T;
-    optSt.T = reduceMotion.matches ? to : to > optSt.T ? Math.min(1, optSt.T + dt * cfg.motion.speed / OPT_MS) : Math.max(0, optSt.T - dt * cfg.motion.speed / OPT_MS);
+    // as stepMerge: forward while hovered, back on leave, the play speed eased by Start/stop
+    const target = optSt.on || cfg.preview ? 1 : -1, r = cfg.motion.smoothing;
+    optSt.V = r <= 0 ? target : optSt.V + (target - optSt.V) * (1 - Math.exp(-dt / (r / 3)));
+    const was = optSt.T;
+    optSt.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(optSt.T + optSt.V * dt * cfg.motion.speed / optMs());
     if (optSt.T !== was) renderOptimizeV1();
     stepPartTint(optParts, optSt.pt, dt);
   }
+  // ---------- 02 · Optimize v1: the base takes in the layers and becomes the cube ----------
+  // The same base and layers as 02 v2 (and its Use brand icon set). The base grows: its front
+  // edge spreads out to the cube's (the same cube as v2, [L0, L0 + D_S]) and every other layer is
+  // taken in as that edge passes through it (see renderUnifyV1). The layers always keep their
+  // paint order (further right on top). Hovering any layer starts it; once it has started, it
+  // keeps playing while the pointer is on the card, and leaving plays it back. Everything is a
+  // pure function of the timeline T, so it plays back exactly. The edge moves over the first
+  // UN_MOVE of T on 04's grow curve.
+  const UN_MS = 2200, UN_MOVE = 0.8, UN_BAND = 24;   // UN_BAND: Figma px either side of a slab over which it fades as the edge passes
+  const unCard = optCard;                                           // lives in 02's card, next to v2's layers
+  const un = [0, 1, 2, 3, 4].map(i => v1Layer(unCard, 'un' + i));
+  un.forEach((c, i) => { c.layer.style.zIndex = 10 + i; });           // fixed paint order: further right on top
+  const unSt = { T: 0, V: 0, pt: null, on: false };
+  const unSet = () => O_SETS[cfg.depth.brand ? 'brand' : 'layers'];
+  const unEdge = T => suEase(T / UN_MOVE);                                      // 0 → 1: rest → cube, on 04's grow curve
+  function renderUnifyV1() {
+    // v1 always builds from the base (leftmost) layer, so it takes the others in left to right
+    const { L: O_L, T: O_T } = unSet(), n = O_L.length, T = unSt.T, src = 0;
+    const R = O_L.map((l, i) => l + O_T[i]), L0 = O_L[0], CUBE = L0 + D_S, e = unEdge(T);
+    // the growing layer: back and front edges spread to the cube's
+    const lo = lerp(O_L[src], L0, e), hi = lerp(R[src], CUBE, e);
+    drawBox(un[src], lo + (D_S + (hi - lo)) / 2, 540, D_S, hi - lo, 0, 1);
+    for (let j = 0; j < n; j++) {
+      if (j === src) continue;
+      // Taken in as the growing edge passes through it: the part the edge has covered is inside
+      // the cube (the slab is eaten from that side), and its pane and lines fade over the band
+      // the edge sweeps across it (from UN_BAND before it to UN_BAND past it), so a slab is gone
+      // just as the edge leaves it behind, thin ones included.
+      const ahead = j > src, edge = ahead ? hi : lo;
+      const a = ahead ? clamp01((edge - (O_L[j] - UN_BAND)) / (O_T[j] + 2 * UN_BAND))
+                      : clamp01(((R[j] + UN_BAND) - edge) / (O_T[j] + 2 * UN_BAND));
+      const o = 1 - smooth(a);
+      if (o <= 0.001) { drawBox(un[j], 540, 540, D_S, 1, 0, 0, 0); continue; }
+      const l = ahead ? Math.min(R[j], Math.max(O_L[j], edge)) : O_L[j], r = ahead ? R[j] : Math.max(O_L[j], Math.min(R[j], edge));
+      const t = Math.max(0.5, r - l);
+      drawBox(un[j], l + (D_S + t) / 2, 540, D_S, t, 0, o, o);
+    }
+  }
+  const renderUnify = () => renderUnifyV1();
+  // 02's version arrows on each side of the card; the title names the version on show
+  const depthVer = () => cfg.depth.v === 2 ? 2 : 1;
+  const ARROW02 = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
+  const depthTag = optCard.querySelector('.tag');
+  optCard.insertAdjacentHTML('beforeend', `<button class="ver prev" type="button" aria-label="Previous version">${ARROW02('M10 3 5 8l5 5')}</button>
+    <button class="ver next" type="button" aria-label="Next version">${ARROW02('M6 3l5 5-5 5')}</button>`);
+  optCard.querySelectorAll('.ver').forEach(b => b.onclick = () => {
+    cfg.depth.v = depthVer() === 2 ? 1 : 2;
+    Object.assign(unSt, { T: 0, V: 0 }); Object.assign(optSt, { T: 0, V: 0 }); save(); applyAll();
+  });
+  function applyDepthVersion() { optCard.dataset.v = depthVer(); depthTag.textContent = depthVer() === 2 ? '02 · Optimize (v2)' : '02 · Optimize'; }
+  // the topmost layer under the pointer, as drawn
+  const unUnder = p => { if (!p) return -1; for (let i = un.length - 1; i >= 0; i--) { const c = un[i]; if (c.vis > 0.5 && c.poly && inPoly(p, c.poly)) return i; } return -1; };
+  unCard.addEventListener('pointerenter', e => { unSt.on = true; unSt.frozen = false; unSt.pt = figOf(unCard, e); });
+  unCard.addEventListener('pointermove', e => { unSt.pt = figOf(unCard, e); });
+  unCard.addEventListener('pointerleave', () => { unSt.on = false; unSt.pt = null; });
+  const unParts = [...un].reverse().map(c => ({ layers: [c.layer], tint: c.stops.flat(), over: p => c.vis > 0.5 && !!c.poly && inPoly(p, c.poly), x: 0, drawn: null }));
+  function stepUnify(dt) {
+    if (unSt.frozen) return;                                            // held by __motion.seekUnify
+    // at rest, the layer under the pointer becomes the one that grows; it starts only on a layer
+    const go = cfg.preview || (unSt.on && (unSt.T > 0 || unUnder(unSt.pt) >= 0));
+    const target = go ? 1 : -1, r = cfg.motion.smoothing;
+    unSt.V = r <= 0 ? target : unSt.V + (target - unSt.V) * (1 - Math.exp(-dt / (r / 3)));
+    const was = unSt.T;
+    unSt.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(unSt.T + unSt.V * dt * cfg.motion.speed / UN_MS);
+    if (unSt.T === 0 && target < 0) unSt.V = 0;                          // at rest: the next start ramps up from still
+    if (unSt.T !== was) renderUnify();
+    stepPartTint(unParts, unSt.pt, dt);
+  }
+
+
   // 03 v3: the two slabs stay put. Hovering the thick one plays v1's collision (it grows into the
   // thin one); hovering the thin one plays it the other way round: the thin one widens to the
   // left while the thick one thins, and they meet and seal into the same cube. Off the shapes, it plays back.
@@ -1486,6 +1575,7 @@
   }
 
   document.querySelectorAll('#card-slices > .layer.v2, #card-slices > .layer.v3, #card-depth > .layer.v2, #card-depth > .layer.v3').forEach(l => l.remove());
+  opt.forEach(c => c.layer.classList.add('v2'));                    // 02 v2's layers (after the old conveyors are cleared)
 
   // ---------- Follow pointer ----------
   // Every stroke near the pointer lights up, fading out by the Radius control, instead of the
@@ -1570,7 +1660,7 @@
   // then it stops until the next input.
   const STEPS = {
     slices: [dt => decideV1.step(dt)],
-    depth: [dt => stepOptimizeV1(dt)],
+    depth: [dt => (depthVer() === 2 ? stepOptimizeV1 : stepUnify)(dt)],
     merge: [dt => stepMerge(dt), dt => stepMergeV2(dt), dt => stepMergeV3(dt)],
     scaleup: [dt => stepScaleUp(dt), dt => stepScaleUpV2(dt), dt => stepScaleUpV3(dt)],
   };
@@ -1638,6 +1728,8 @@
   const CARD_PARAMS = {
     slices: { note: 'The hovered layer widens to both sides and the layers around it narrow to make room; the cube keeps its size. Widen: how much wider the hovered layer gets.', fields: [
       { k: 'widen', label: 'Widen', min: 0, max: 70, step: 1, fmt: px }] },
+    depth:  { note: 'v1: hover a layer and the base grows into the cube, taking the others in left to right: each one is eaten and fades as the base\'s edge passes through it. v2 (arrows): the layers leave to the right one by one while the base deepens into the whole cube. Both move on 04\'s grow curve. Use brand icon swaps the layers for the brand icon (Figma 8050:8025) in both.', fields: [
+      { k: 'brand', type: 'check', label: 'Use brand icon' }] },
     merge:  { note: 'Two slabs collide and fuse into one cube; the seam between them zips shut behind a spark. On leave it plays back. Impact: how hard the block rings when they hit.', fields: [
       { k: 'impact', label: 'Impact', min: 0, max: 60, step: 1, fmt: px }] },
     scaleup: { note: 'A window opens in the back wall, extrudes into a small cube, and grows into the new cube while the old one fades. Pause: how long it holds at the end of each cycle. The cube lies on its side (as in Figma 7907:5126) in this version and the first alternative; Straight stands it upright.', fields: [
@@ -1666,7 +1758,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderMerge(); renderScaleUp(); decideV1.render(); renderOptimizeV1(); renderMergeV2(); renderScaleUpV2(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderMerge(); renderScaleUp(); decideV1.render(); renderOptimizeV1(); renderUnify(); applyDepthVersion(); renderMergeV2(); renderScaleUpV2(); renderMergeV3(); renderScaleUpV3(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
   function fieldRow(f, obj, id) {
