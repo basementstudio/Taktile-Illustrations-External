@@ -71,7 +71,7 @@
   /* Figma colors → theme tokens (CSS beats SVG presentation attributes) */
   .card [fill="#0B0A0A"] { fill: var(--fill); }
   /* --otint is set by the Colorize outline toggle; --ohot (0..1) is how directly the shape is hovered */
-  .card [stroke="#FDFCFC"] { stroke: color-mix(in srgb, var(--otint, var(--line)) calc(var(--ohot, 0) * 100%), var(--line)); }
+  .card [stroke="#FDFCFC"] { stroke-width: 1.5; stroke: color-mix(in srgb, var(--otint, var(--line)) calc(var(--ohot, 0) * 100%), var(--line)); }
   .card [fill="#FDFCFC"] { fill: var(--line); }
   /* --tint is set by the Colorize toggle; otherwise the hover tint is the theme's grey */
   .card stop[stop-color="#353232"] { stop-color: color-mix(in srgb, var(--tint, var(--inner-hot)) calc(var(--hot, 0) * 100%), var(--inner)); }

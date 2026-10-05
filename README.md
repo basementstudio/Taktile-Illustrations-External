@@ -11,7 +11,7 @@ Four animations:
 3. **Connect**: two slabs collide and fuse into one cube; the seam zips shut behind a spark
 4. **Scale** (loop): the window scales up and extrudes at once into the big cube, while the old cube flattens toward the back and fades; then a new window opens. The cube lies on its side by default (Figma 7907:5126); the **Straight cube** toggle (Customize parameters) stands it upright
 
-All cards are drawn procedurally from the Figma frames' geometry. Inner edges are solid lines (#353232 dark, #9A9797 light). Only 02 has more than one version (arrows on the card); 02 moves on a sharp-peak speed curve.
+All cards are drawn procedurally from the Figma frames' geometry. Inner edges are solid lines (#353232 dark, #9A9797 light); the white outline is 1.5px on screen. Only 02 has more than one version (arrows on the card); 02 moves on a sharp-peak speed curve.
 
 Layers that have fully faded leave the render tree (`display: none`), so their blur panes can't leave a faint ghost line behind.
 
