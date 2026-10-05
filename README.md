@@ -15,7 +15,7 @@ All cards are drawn procedurally from the Figma frames' geometry. Inner edges ar
 
 Layers that have fully faded leave the render tree (`display: none`), so their blur panes can't leave a faint ghost line behind.
 
-- The side panel only holds what every animation shares: Motion, BG Blur, colour options, Follow pointer, Preview.
+- The side panel only holds what every animation shares: Motion (Speed, Bounce, Fades, Start/stop) and Hover (Color per animation, Follow pointer). The hover spring uses the Butter curve, the background blur is fixed at 5px and the hover tint is the theme grey.
 - **Color per animation** gives each card its own hover colour: 01 #463ECC, 02 #C98C2D, 03 #2386CF, 04 #0E9755.
 - Each card's own settings live in a collapsed **Customize parameters** dropdown inside that card.
 - Loops always return to rest when the pointer leaves.

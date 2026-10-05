@@ -114,16 +114,6 @@
   /* per-layer hover: every value comes from the controls */
   .hit { fill: transparent; stroke: none; pointer-events: all; }
 
-  /* curve presets */
-  .curves { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin: 10px 0 4px; }
-  .curve {
-    display: grid; gap: 4px; justify-items: center; padding: 8px 4px 6px; cursor: pointer;
-    background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font: 11px/1 inherit;
-  }
-  .curve svg { width: 100%; height: 34px; overflow: visible; }
-  .curve path { stroke: currentColor; fill: none; stroke-width: 1.5; }
-  .curve[aria-pressed="true"] { background: var(--control); color: var(--text); border-color: var(--muted); }
-
   /* controls */
   aside {
     border-left: 1px solid var(--border); background: var(--panel);
@@ -146,10 +136,6 @@
   .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 4px; overflow: hidden; }
   .seg button { border: 0; background: transparent; color: var(--muted); padding: 6px 10px; font: inherit; cursor: pointer; }
   .seg button[aria-pressed="true"] { background: var(--control); color: var(--text); }
-  .btn {
-    background: var(--control); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
-    padding: 6px 10px; font: inherit; cursor: pointer;
-  }
   /* per-card parameters: a collapsed dropdown in the card's bottom-left corner that opens upward */
   .tune {
     position: absolute; left: 10px; right: 10px; bottom: 10px; z-index: 300; max-height: calc(100% - 44px);
@@ -192,9 +178,7 @@
   .ver:hover { color: var(--text); }
   .ver.prev { left: 4px; } .ver.next { right: 4px; }
 
-  .actions { display: flex; gap: 8px; margin-top: 28px; }
   .check { display: flex; align-items: center; gap: 8px; color: var(--muted); margin: 10px 0; cursor: pointer; }
-  .toast { color: var(--muted); font-size: 12px; min-height: 18px; margin-top: 8px; }
 
   @media (max-width: 900px) {
     .app { grid-template-columns: 1fr; }
@@ -205,8 +189,6 @@
   @media (max-width: 900px) { .grid[data-cols="3"], .grid[data-cols="4"] { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 560px) { .grid, .grid[data-cols] { grid-template-columns: 1fr; } }
   :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .copy-fallback { width: 100%; height: 160px; margin-top: 8px; font: 11px var(--mono);
-    background: var(--control); color: var(--text); border: 1px solid var(--border); border-radius: 4px; }
 </style>
 <div class="app">
   <main>
@@ -273,8 +255,10 @@
   try {
     const s = JSON.parse(localStorage.getItem(KEY));
     if (s) for (const k of SAVED) Object.assign(cfg[k], s[k]);
-    if (!CURVES[cfg.motion.curve]) cfg.motion.curve = DEFAULTS.motion.curve;
   } catch {}
+  // fixed now (no longer in the panel): Butter curve, 5px blur, no Colorize / Colorize outline
+  cfg.motion.curve = DEFAULTS.motion.curve;
+  Object.assign(cfg.look, { blur: DEFAULTS.look.blur, colorize: false, outline: false });
   // shared motion helpers
   const damping = () => 1 - 0.7 * cfg.motion.bounce;               // spring damping from Bounce
   const smooth = t => { t = Math.min(1, Math.max(0, t)); return t * t * t * (t * (t * 6 - 15) + 10); };
@@ -1695,28 +1679,15 @@
   const panel = $('#panel');
   // each spring's step response on a shared 1.6s time axis, so the icons also compare speed
   // (drawn with the current Bounce, so the icons show the overshoot too)
-  const curveIcon = ({ response }) => {
-    const w = 2 * Math.PI / response, k = w * w, c = 2 * damping() * w, T = 1.6, N = 64, hs = T / N / 8;
-    let x = 0, v = 0, d = 'M4 30';
-    for (let i = 1; i <= N; i++) {
-      for (let j = 0; j < 8; j++) { v += (k * (1 - x) - c * v) * hs; x += v * hs; }
-      d += `L${(4 + i / N * 72).toFixed(1)} ${(30 - x * 24).toFixed(1)}`;
-    }
-    return `<svg viewBox="0 0 80 34" aria-hidden="true"><path d="${d}"/></svg>`;
-  };
   // Side panel: only what every animation shares
   const SECTIONS = [
     { title: 'Motion', note: 'Shared by every animation on the page. Loops always finish their cycle and come to rest when the pointer leaves.', key: 'motion', fields: [
       { k: 'speed',     label: 'Speed',      min: 0.25, max: 3, step: 0.05, fmt: v => v.toFixed(2) + '×' },
-      { k: 'curve', type: 'curves' },
       { k: 'bounce',    label: 'Bounce',     min: 0, max: 1, step: 0.01, fmt: v => Math.round(v * 100) + '%' },
       { k: 'fade',      label: 'Fades',      min: 0.1, max: 1, step: 0.01, fmt: v => Math.round(v * 100) + '%' },
       { k: 'smoothing', label: 'Start/stop', min: 0, max: 1000, step: 10, fmt: v => v + 'ms' },
     ]},
-    { title: 'BG Blur', note: 'Background blur behind every layer.', key: 'look', fields: [
-      { k: 'blur', label: 'Blur', min: 0, max: 24, step: 1, fmt: v => v + 'px' },
-      { k: 'colorize', type: 'check', label: 'Colorize' },
-      { k: 'outline', type: 'check', label: 'Colorize outline' },
+    { title: 'Hover', note: 'How the shapes under the pointer light up.', key: 'look', fields: [
       { k: 'perCard', type: 'check', label: 'Color per animation' },
       { k: 'follow', type: 'check', label: 'Follow pointer', rebuild: true },
       // only while Follow pointer is on: reach of the reveal, and how much of it is a soft edge
@@ -1766,18 +1737,10 @@
 
   function applyAll() { applyHover(); renderMerge(); decideV1.render(); renderOptimizeV1(); renderUnify(); applyDepthVersion(); renderScaleUpV2(); applyVersions(); applyLook(); applyLayout(); }
 
-  // one control row: a slider, a checkbox or the curve presets, bound to obj[f.k]
+  // one control row: a slider or a checkbox, bound to obj[f.k]
   function fieldRow(f, obj, id) {
     const row = document.createElement('div');
-    if (f.type === 'curves') {
-      row.className = 'curves'; row.setAttribute('role', 'group'); row.setAttribute('aria-label', 'Curve');
-      row.innerHTML = Object.entries(CURVES).map(([k, c]) =>
-        `<button class="curve" data-k="${k}" aria-pressed="${obj.curve === k}" title="spring · ${c.response}s">${curveIcon(c)}${c.label}</button>`).join('');
-      row.querySelectorAll('button').forEach(b => b.onclick = () => {
-        obj.curve = b.dataset.k; save(); applyAll();
-        row.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b));
-      });
-    } else if (f.type === 'check') {
+    if (f.type === 'check') {
       row.innerHTML = `<label class="check"><input id="${id}" type="checkbox" ${obj[f.k] ? 'checked' : ''}> ${f.label}</label>`;
       row.querySelector('input').onchange = e => { obj[f.k] = e.target.checked; save(); applyAll(); if (f.rebuild) buildPanel(); };
     } else {
@@ -1787,9 +1750,6 @@
       const inp = row.querySelector('input'), out = row.querySelector('output');
       inp.oninput = () => {
         obj[f.k] = +inp.value; out.textContent = f.fmt(+inp.value); save(); applyAll();
-        if (f.k === 'bounce') panel.querySelectorAll('.curve').forEach(b => {   // redraw the curves with the new bounce
-          b.querySelector('svg').outerHTML = curveIcon(CURVES[b.dataset.k]);
-        });
       };
     }
     return row;
@@ -1822,50 +1782,6 @@
       panel.insertAdjacentHTML('beforeend', `<h2>${sec.title}</h2><p>${sec.note}</p>`);
       for (const f of sec.fields) if (!f.when || f.when()) panel.appendChild(fieldRow(f, cfg[sec.key], `${sec.key}-${f.k}`));
     }
-    panel.insertAdjacentHTML('beforeend', `
-      <h2>Preview</h2>
-      <label class="check"><input id="preview" type="checkbox" ${cfg.preview ? 'checked' : ''}> Hover everything</label>
-      <div class="actions"><button class="btn" id="copy">Copy config JSON</button><button class="btn" id="reset">Reset all</button></div>
-      <div class="toast" id="toast"></div>`);
-    $('#preview').onchange = e => {
-      cfg.preview = e.target.checked;
-      applyAll();
-    };
-    $('#copy').onclick = async () => {
-      const lift = k => ({ strength: cfg[k].strength, influence: cfg[k].influence, influenceRadiusPx: Math.round(cfg[k].influence * INFLUENCE_RADIUS) });
-      const txt = JSON.stringify({
-        motion: { speed: cfg.motion.speed, curve: cfg.motion.curve, bounce: cfg.motion.bounce, fades: cfg.motion.fade,
-          startStopMs: cfg.motion.smoothing, returnToRest: { direction: 'always forward, finishes the cycle', curve: 'cubic Hermite ease-out from current speed', durationVsFullSpeed: RETURN_SLOW },
-          hoverSpring: { responseS: +(CURVES[cfg.motion.curve].response / cfg.motion.speed).toFixed(3), damping: +damping().toFixed(3) },
-          timedMoves: 'smootherstep + bounce overshoot' },
-        backgroundBlur: `blur(${cfg.look.blur}px), every layer`,
-        hoverTint: cfg.look.colorize ? COLORIZE : 'theme grey',
-        colorPerAnimation: cfg.look.perCard ? CARD_COLORS : false,
-        hoveredOutline: cfg.look.outline ? `${COLORIZE}, only the shape under the cursor` : 'unchanged',
-        followPointer: cfg.look.follow ? { radiusPx: cfg.look.spotR, blurPct: Math.round(cfg.look.spotSoft * 100), falloff: 'smoothstep over the blurred share of the radius', pointerSmoothingMs: 70 } : false,
-        slices: { ...lift('slices'), spinDeg: cfg.slices.spin, spinDirection: 'up' },
-        depth: { stepMs: Math.round(DEPTH_STEP_MS / cfg.motion.speed), onHover: '01 → 02 → 03, then holds', onLeave: '03 → 01 directly', thickPx: cfg.depth.size, thinPx: +D_THIN.toFixed(1),
-          pausePct: Math.round(cfg.depth.hold * 100), spinDeg: cfg.depth.spin, spinDirection: 'up', curve: 'smootherstep + bounce overshoot', both: 'the thick slab thins while the next one thickens, stack width stays the same' },
-        merge: { durationMs: Math.round(MERGE_MS / cfg.motion.speed), phases: { approach: '0–57%', impactAndZip: '57–100%' },
-          impactPx: cfg.merge.impact, handover: 'panes crossfade over the first 12% of the impact',
-          seam: 'zips shut from the middle out behind a spark', onLeave: 'plays back' },
-        scaleup: { cycleMs: Math.round(SCALEUP_MS / cfg.motion.speed), pausePct: Math.round(cfg.scaleup.hold * 100),
-          phases: { frontFaceOpens: '4–26% (front-left face, scales up from its bottom edge)', extrudesBackwards: '26–48%', growsToCentre: '56–86%', oldCubeFades: '56–71% (gone before the new one lands)' },
-          growCurve: { type: 'speed graph with a sharp peak (Lorentzian)', peakAt: SU_PEAK, sharpness: SU_K } },
-        cardsPerRow: cfg.layout.cols,
-      }, null, 2);
-      try { await navigator.clipboard.writeText(txt); $('#toast').textContent = 'Copied to clipboard.'; }
-      catch {
-        let ta = panel.querySelector('.copy-fallback');
-        if (!ta) { ta = document.createElement('textarea'); ta.className = 'copy-fallback'; ta.id = 'copy-fallback'; ta.readOnly = true; panel.appendChild(ta); }
-        ta.value = txt; ta.focus(); ta.select();
-        $('#toast').textContent = 'Clipboard unavailable here: the config is selected below, copy it with Ctrl+C.';
-      }
-    };
-    $('#reset').onclick = () => {
-      cfg = clone(DEFAULTS); save();
-      buildPanel(); buildAllCardParams(); applyAll();
-    };
   }
 
   // theme
