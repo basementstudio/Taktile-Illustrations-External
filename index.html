@@ -96,8 +96,8 @@
   /* Figma colors → theme tokens (CSS beats SVG presentation attributes) */
   .card [fill="#0B0A0A"] { fill: var(--fill); }
   /* --otint is set by the Colorize outline toggle; --ohot (0..1) is how directly the shape is hovered */
-  /* white lines: the Outline width control (--ow); every grey line stays at 1px */
-  .card [stroke="#FDFCFC"], .card path.seam { stroke-width: var(--ow, 1.25px); }
+  /* every line, white or grey, is 1px on screen */
+  .card [stroke="#FDFCFC"], .card path.seam { stroke-width: 1px; }
   .card [stroke="#FDFCFC"] { stroke: color-mix(in srgb, var(--otint, var(--line)) calc(var(--ohot, 0) * 100%), var(--line)); }
   .card [fill="#FDFCFC"] { fill: var(--line); }
   /* --tint is set by the Colorize toggle; otherwise the hover tint is the theme's grey */
@@ -266,7 +266,7 @@
   const DEFAULTS = {
     // shared by every animation on the page (the side panel)
     motion: { speed: 1, curve: 'butter', bounce: 0, fade: 0.6, smoothing: 350 },
-    look:   { blur: 5, colorize: false, outline: false, perCard: false, follow: false, spotR: 300, spotSoft: 1, outlineW: 1.25 },
+    look:   { blur: 5, colorize: false, outline: false, perCard: false, follow: false, spotR: 300, spotSoft: 1 },
     // each card's own parameters (its Customize parameters dropdown)
     slices: { strength: 14, influence: 0.45, spin: 90, widen: 30 },
     depth:  { size: 130, hold: 0.3, spin: 90, greyMs: 90, shift: 14 },
@@ -1731,9 +1731,6 @@
       { k: 'fade',      label: 'Fades',      min: 0.1, max: 1, step: 0.01, fmt: v => Math.round(v * 100) + '%' },
       { k: 'smoothing', label: 'Start/stop', min: 0, max: 1000, step: 10, fmt: v => v + 'ms' },
     ]},
-    { title: 'Lines', note: 'Width of the white outlines. The grey inner edges always stay at 1px.', key: 'look', fields: [
-      { k: 'outlineW', label: 'Outline', min: 0.5, max: 2.5, step: 0.25, fmt: v => v.toFixed(2) + 'px' },
-    ]},
     { title: 'Hover', note: 'How the shapes under the pointer light up.', key: 'look', fields: [
       { k: 'perCard', type: 'check', label: 'Color per animation' },
       { k: 'follow', type: 'check', label: 'Follow pointer', rebuild: true },
@@ -1768,7 +1765,6 @@
   function applyLook() {
     const root = document.documentElement.style;
     root.setProperty('--blur', cfg.look.blur + 'px');
-    root.setProperty('--ow', cfg.look.outlineW + 'px');
     if (cfg.look.colorize) root.setProperty('--tint', COLORIZE); else root.removeProperty('--tint');
     if (cfg.look.outline) root.setProperty('--otint', COLORIZE); else root.removeProperty('--otint');
     document.documentElement.classList.toggle('follow', !!cfg.look.follow);

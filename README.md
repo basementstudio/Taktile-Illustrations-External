@@ -11,13 +11,13 @@ Four animations:
 3. **Optimize** (the brand icon, Figma 8050:8025; ported from the 02 of tomasv912/Taktile-Claude-Illustrations, its reveal version): played once on the first hover of the shape, the layers come out of each other's front face one after another and slide into place, their back edges going grey → white; then it stays on the brand icon, where the hovered layer slides right (Shift) and its neighbours follow
 4. **Scale** (loop): the window scales up and extrudes at once into the big cube, while the old cube flattens toward the back and fades; then a new window opens. The cube lies on its side by default (Figma 7907:5126); the **Straight cube** toggle (Customize parameters) stands it upright
 
-All cards are drawn procedurally from the Figma frames' geometry. Inner edges are solid lines (#353232 dark, #9A9797 light); every grey line is 1px; the white outlines are 1.25px by default, set with **Lines → Outline** (0.5–2.5px in 0.25 steps). No card has alternative versions.
+All cards are drawn procedurally from the Figma frames' geometry. Inner edges are solid lines (#353232 dark, #9A9797 light); every line, white or grey, is 1px on screen. No card has alternative versions.
 
 Under each card's title, a step badge (Figma 8451:3801 / 3827 / 3849 / 3870) shows the four pillars in order with the card's own one lit in its colour.
 
 Layers that have fully faded leave the render tree (`display: none`), so their blur panes can't leave a faint ghost line behind.
 
-- The side panel only holds what every animation shares: Motion (Speed, Bounce, Fades, Start/stop), Lines (Outline width) and Hover (Color per animation, Follow pointer). The hover spring uses the Butter curve, the background blur is fixed at 5px and the hover tint is the theme grey.
+- The side panel only holds what every animation shares: Motion (Speed, Bounce, Fades, Start/stop) and Hover (Color per animation, Follow pointer). The hover spring uses the Butter curve, the background blur is fixed at 5px and the hover tint is the theme grey.
 - **Color per animation** gives each card its own hover colour: 01 Connect #2386CF, 02 Decide #463ECC, 03 Optimize #C98C2D, 04 Scale #0E9755.
 - Each card's own settings live in a collapsed **Customize parameters** dropdown inside that card.
 - Loops always return to rest when the pointer leaves.
