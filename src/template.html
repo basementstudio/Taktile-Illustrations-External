@@ -96,7 +96,9 @@
   /* Figma colors → theme tokens (CSS beats SVG presentation attributes) */
   .card [fill="#0B0A0A"] { fill: var(--fill); }
   /* --otint is set by the Colorize outline toggle; --ohot (0..1) is how directly the shape is hovered */
-  .card [stroke="#FDFCFC"] { stroke-width: 1.5; stroke: color-mix(in srgb, var(--otint, var(--line)) calc(var(--ohot, 0) * 100%), var(--line)); }
+  /* white lines: the Outline width control (--ow); every grey line stays at 1px */
+  .card [stroke="#FDFCFC"], .card path.seam { stroke-width: var(--ow, 1.25px); }
+  .card [stroke="#FDFCFC"] { stroke: color-mix(in srgb, var(--otint, var(--line)) calc(var(--ohot, 0) * 100%), var(--line)); }
   .card [fill="#FDFCFC"] { fill: var(--line); }
   /* --tint is set by the Colorize toggle; otherwise the hover tint is the theme's grey */
   .card stop[stop-color="#353232"] { stop-color: color-mix(in srgb, var(--tint, var(--inner-hot)) calc(var(--hot, 0) * 100%), var(--inner)); }
@@ -264,10 +266,10 @@
   const DEFAULTS = {
     // shared by every animation on the page (the side panel)
     motion: { speed: 1, curve: 'butter', bounce: 0, fade: 0.6, smoothing: 350 },
-    look:   { blur: 5, colorize: false, outline: false, perCard: false, follow: false, spotR: 300, spotSoft: 1 },
+    look:   { blur: 5, colorize: false, outline: false, perCard: false, follow: false, spotR: 300, spotSoft: 1, outlineW: 1.25 },
     // each card's own parameters (its Customize parameters dropdown)
     slices: { strength: 14, influence: 0.45, spin: 90, widen: 30 },
-    depth:  { size: 130, hold: 0.3, spin: 90, v: 1, greyMs: 90, shift: 14 },
+    depth:  { size: 130, hold: 0.3, spin: 90, greyMs: 90, shift: 14 },
     merge:  { impact: 18 },
     scaleup: { hold: 0.2, straight: false },
     layout: { cols: 2 },
@@ -1323,10 +1325,10 @@
 
   // ---------- 03 · Optimize, ported from tomasv912/Taktile-Claude-Illustrations (its 02): the brand icon (Figma 8050:8025) ----------
   // Always the brand icon's base and layers: a base 34 deep, then layers 12, 5, 2 and 2 deep that
-  // spread further apart toward the right. Two versions, switched with the card's arrows, both
-  // played once, on the first hover (the play speed eased by Start/stop), staying on the brand icon
-  // after it; there, the layer under the pointer slides right and its neighbours follow.
-  //  v1 (reveal): at rest only the base shows, at its full depth. On hover the other layers come
+  // spread further apart toward the right. It plays once, on the first hover (the play speed eased
+  // by Start/stop), staying on the brand icon after it; there, the layer under the pointer slides
+  // right and its neighbours follow. (The source's v2, the split, was dropped.)
+  //  The reveal: at rest only the base shows, at its full depth. On hover the other layers come
   //     out one after another, each on 04's grow curve, from the front face of the layer before it,
   //     and slide right into place, extruding as they go. No opacity: a layer is born with no depth
   //     exactly on that face (its outline on the face's outline, its pane, painted with the full
@@ -1335,10 +1337,9 @@
   //     Grey → white, while its right half lies white on the face's white outline from the start.
   //     While it is still almost on that face (within OPT1_SEP), the face's own grey edges are
   //     softened in step with the gap, so the two lines never read as a double line.
-  //  v2 (split): 01 Connect backwards (see renderOptimize).
   const O_L = [338.95, 382.95, 410.95, 446.95, 507.95], O_T = [34, 12, 5, 2, 2], O_N = O_L.length;
-  const OPT_MS = [2800, 2800];                                          // v1, v2 at speed 1×
-  // both: the timeline opens with the base (v1) or the block (v2) extruding to the right from half
+  const OPT_MS = 2800;                                                  // at speed 1×
+  // the timeline opens with the base extruding to the right from half
   // its depth to its full depth over OPT_EXT_MS, on 04's grow curve; the rest follows after it
   // It plays once, on the first hover, and never plays back: it stays on the brand icon.
   const OPT_EXT_MS = 600, OPT_EXT_FROM = 0.5;
@@ -1346,27 +1347,21 @@
   // Figma px), keeping its depth, and the layers beside it follow, less the further they are: by
   // OPT_PULL_R per step to its right, OPT_PULL_L per step to its left (so no two ever touch)
   const OPT_PULL_R = 0.6, OPT_PULL_L = 0.3;
-  // v1: each layer's window and the stagger between them
+  // each layer's window and the stagger between them
   const OPT1_WIN = 0.55, OPT1_STEP = (1 - OPT1_WIN) / (O_N - 2);
-  // v2: the block splits over [0, OPT2_SPLIT] (its cuts open one after another, each over OPT2_CUT of
-  // that phase, OPT2_CUT_STEP apart), then the pieces fly apart into place over the rest
-  const OPT2_SPLIT = 0.4, OPT2_CUT = 0.55, OPT2_CUT_STEP = (1 - OPT2_CUT) / (O_N - 2), OPT2_BOUNCE = 0.5;
   const optCard = $('#card-depth');
   const opt = O_L.map((_, i) => v1Layer(optCard, 'op' + i));
   opt.forEach((c, i) => { c.layer.style.zIndex = 10 + 2 * i; });       // fixed paint order: further right on top
-  // v1: a grey line over each layer's left half (its back edges, the "<"), just above that layer
+  // a grey line over each layer's left half (its back edges, the "<"), just above that layer
   const optEdge = opt.map((_, i) => { const S = makeSeam('opE' + i, optCard); S.layer.style.zIndex = 11 + 2 * i;
-    S.seamLines.forEach(sl => { sl.glow.style.display = 'none'; sl.line.setAttribute('stroke-width', '1.2'); }); return S; });
+    S.seamLines.forEach(sl => { sl.glow.style.display = 'none'; sl.line.style.strokeWidth = '1px'; }); return S; });
   const optSt = { T: 0, V: 0, pt: null, on: false };
   const optHv = { hot: -1, cand: -1, since: 0, t: O_T.map(() => 0), v: O_T.map(() => 0) };   // the hover on the brand icon: each layer's offset to the right and its speed
-  const depthVer = () => cfg.depth.v === 2 ? 2 : 1;
-  // v2: one seam per cut, above every layer
-  const optSeams = [1, 2, 3, 4].map(j => { const S = makeSeam('opS' + j, optCard); S.layer.style.zIndex = 40; return S; });
   const hideOpt = c => drawBox(c, 540, 540, D_S, 1, 0, 0, 0);
   // a layer's own line colour: m = 0 the theme's line (white in dark), 1 the inner edges' grey
   const setLineMix = (c, m) => { const v = m <= 0.001 ? '' : `color-mix(in srgb, var(--inner) ${(m * 100).toFixed(1)}%, var(--line-c))`;
     if (c.layer._lm !== v) { c.layer._lm = v; if (v) c.layer.style.setProperty('--line', v); else c.layer.style.removeProperty('--line'); } };
-  // v1: soften the grey front-face edges of layer c (its front at x) by d (0..1), leaving its other
+  // soften the grey front-face edges of layer c (its front at x) by d (0..1), leaving its other
   // inner edges alone: while the next layer is still almost on that face, its own back edge carries
   // the line, so the two never read as a double line
   const OPT1_SEP = 8;                                                    // Figma px of gap over which the face's edges come back
@@ -1384,43 +1379,16 @@
   // layer born on top of another, or the block handing over to its pieces, changes nothing)
   opt.forEach(c => c.blur.style.setProperty('--fill-a', '100%'));
   function renderOptimize() {
-    const v = depthVer(), E = OPT_EXT_MS / OPT_MS[v - 1];
+    const E = OPT_EXT_MS / OPT_MS;
     if (optSt.T >= 1) {
       // on the brand icon: each layer at its own depth, moved right by its hover offset
-      optSeams.forEach(S => drawSeam(S, 0, 0, 0)); optEdge.forEach(S => drawSeam(S, 0, 0, 0));
+      optEdge.forEach(S => drawSeam(S, 0, 0, 0));
       opt.forEach((c, i) => { setLineMix(c, 0); drawBox(c, O_L[i] + optHv.t[i] + (D_S + O_T[i]) / 2, 540, D_S, O_T[i], 0, 1); });
       return;
     }
     const ext = lerp(OPT_EXT_FROM, 1, suEase(optSt.T / E));             // the opening extrusion, half → full depth
     const T = clamp01((optSt.T - E) / (1 - E));                          // the rest of the timeline, after it
-    if (v !== 2) optSeams.forEach(S => drawSeam(S, 0, 0, 0));
-    if (v !== 1) optEdge.forEach(S => drawSeam(S, 0, 0, 0));
-    if (v === 2) {
-      // 01 Connect played backwards: one block (as deep as all the layers together) shudders with
-      // Connect's impact ring run in reverse while its cuts open one after another, each seam coming
-      // back from its tips to its middle behind Connect's spark; then the pieces fly apart, fast first
-      // and settling, into the brand icon
-      const P = []; O_T.reduce((x, t, i) => (P[i] = x, x + t * ext), O_L[0]);   // the pieces, side by side
-      const total = O_T.reduce((a, b) => a + b, 0), S = clamp01(T / OPT2_SPLIT);
-      opt.forEach(c => setLineMix(c, 0));
-      if (T < OPT2_SPLIT) {
-        // Connect's ring reversed, with one bump less (two half-waves instead of 03's three)
-        const f = 1 - S, ring = OPT2_BOUNCE * cfg.merge.impact * Math.sin(2 * Math.PI * f) * (1 - f) * (1 - f) * Math.exp(-1.5 * f);
-        const w = total * ext + ring;
-        drawBox(opt[0], O_L[0] + (D_S + w) / 2, 540, D_S, w, 0, 1);
-        opt.slice(1).forEach(hideOpt);
-        optSeams.forEach((Sm, j) => {
-          const open = smooth((S - j * OPT2_CUT_STEP) / OPT2_CUT);
-          drawSeam(Sm, P[j + 1] + ring * (P[j + 1] - O_L[0]) / (total * ext), 1 - open, open > 0.001 ? 1 : 0);
-        });
-        return;
-      }
-      optSeams.forEach(Sm => drawSeam(Sm, 0, 0, 0));
-      const u = 1 - Math.pow(1 - (T - OPT2_SPLIT) / (1 - OPT2_SPLIT), 2.4);   // Connect's approach, reversed: fast, then settling
-      opt.forEach((c, i) => { const L = lerp(P[i], O_L[i], u), t = O_T[i] * ext; drawBox(c, L + (D_S + t) / 2, 540, D_S, t, 0, 1); });
-      return;
-    }
-    // v1: each layer comes out of the front face of the one before it, wherever that one is now
+    // each layer comes out of the front face of the one before it, wherever that one is now
     let prevFront = O_L[0] + O_T[0] * ext;
     opt.forEach((c, i) => {
       if (i === 0) return drawBase(c, O_T[0] * ext);
@@ -1434,7 +1402,7 @@
       // edges) starts under a grey line, the grey of the face's inner edges, that fades away over
       // Grey → white.
       const t = lerp(0, O_T[i], k), L = lerp(from, O_L[i], k);
-      const g = (cfg.depth.greyMs || 0) / (OPT_MS[0] - OPT_EXT_MS);       // Grey → white, as a share of the layers' timeline
+      const g = (cfg.depth.greyMs || 0) / (OPT_MS - OPT_EXT_MS);       // Grey → white, as a share of the layers' timeline
       setLineMix(c, 0);
       drawBox(c, L + (D_S + t) / 2, 540, D_S, Math.max(0.5, t), 0, 1);
       drawSeam(optEdge[i], L, 0, g > 0 ? 1 - smooth((T - (i - 1) * OPT1_STEP) / g) : 0, 'var(--inner)', false);
@@ -1455,7 +1423,7 @@
     const target = overShape || cfg.preview || optSt.T > 0 ? 1 : -1, r = cfg.motion.smoothing;
     optSt.V = r <= 0 ? target : optSt.V + (target - optSt.V) * (1 - Math.exp(-dt / (r / 3)));
     const was = optSt.T;
-    optSt.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(optSt.T + optSt.V * dt * cfg.motion.speed / OPT_MS[depthVer() - 1]);
+    optSt.T = reduceMotion.matches ? (target > 0 ? 1 : 0) : clamp01(optSt.T + optSt.V * dt * cfg.motion.speed / OPT_MS);
     if (optSt.T === 0 && target < 0) optSt.V = 0;                        // at rest: the first start ramps up from still
     // on the brand icon, the hover: as 01 Decide, the shape under the pointer takes over after a
     // short settle, and every layer's depth follows its target on the same spring
@@ -1479,15 +1447,6 @@
     if (optSt.T !== was || moved) renderOptimize();
     stepPartTint(optParts, optSt.pt, dt);
   }
-  // 02's version arrows on each side of the card; the title names the version on show
-  const ARROW02 = d => `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${d}" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>`;
-  const depthTag = optCard.querySelector('.tag');
-  optCard.insertAdjacentHTML('beforeend', `<button class="ver prev" type="button" aria-label="Previous version">${ARROW02('M10 3 5 8l5 5')}</button>
-    <button class="ver next" type="button" aria-label="Next version">${ARROW02('M6 3l5 5-5 5')}</button>`);
-  optCard.querySelectorAll('.ver').forEach(b => b.onclick = () => {
-    cfg.depth.v = 3 - depthVer(); Object.assign(optSt, { T: 0, V: 0 }); Object.assign(optHv, { hot: -1, cand: -1, t: O_T.map(() => 0), v: O_T.map(() => 0) }); save(); applyAll();
-  });
-  function applyDepthVersion() { depthTag.textContent = ['03 · Optimize', '03 · Optimize (v2)'][depthVer() - 1]; }
 
 
   // 03 v3: the two slabs stay put. Hovering the thick one plays v1's collision (it grows into the
@@ -1772,6 +1731,9 @@
       { k: 'fade',      label: 'Fades',      min: 0.1, max: 1, step: 0.01, fmt: v => Math.round(v * 100) + '%' },
       { k: 'smoothing', label: 'Start/stop', min: 0, max: 1000, step: 10, fmt: v => v + 'ms' },
     ]},
+    { title: 'Lines', note: 'Width of the white outlines. The grey inner edges always stay at 1px.', key: 'look', fields: [
+      { k: 'outlineW', label: 'Outline', min: 0.5, max: 2.5, step: 0.25, fmt: v => v.toFixed(2) + 'px' },
+    ]},
     { title: 'Hover', note: 'How the shapes under the pointer light up.', key: 'look', fields: [
       { k: 'perCard', type: 'check', label: 'Color per animation' },
       { k: 'follow', type: 'check', label: 'Follow pointer', rebuild: true },
@@ -1791,7 +1753,7 @@
   const CARD_PARAMS = {
     slices: { note: 'The hovered layer widens to both sides and the layers around it narrow to make room; the cube keeps its size. Widen: how much wider the hovered layer gets.', fields: [
       { k: 'widen', label: 'Widen', min: 0, max: 70, step: 1, fmt: px }] },
-    depth:  { note: 'v1 reveals the layers out of each other; v2 (on the arrows) splits one block into them. Grey → white (v1): how long the left half of a newly born layer\'s outline takes to turn from the inner edges\' grey to white (its right half is white from the start). It plays once and stays on the brand icon; there, the layer under the pointer slides right by Shift and the layers beside it follow, less the further they are.', fields: [
+    depth:  { note: 'The layers come out of each other one after another. Grey → white: how long the left half of a newly born layer\'s outline takes to turn from the inner edges\' grey to white (its right half is white from the start). It plays once and stays on the brand icon; there, the layer under the pointer slides right by Shift and the layers beside it follow, less the further they are.', fields: [
       { k: 'greyMs', label: 'Grey → white', min: 0, max: 600, step: 10, fmt: v => v + 'ms' },
       { k: 'shift', label: 'Shift', min: 0, max: 24, step: 1, fmt: px }] },
     merge:  { note: 'Two slabs collide and fuse into one cube; the seam between them zips shut behind a spark. On leave it plays back. Impact: how hard the block rings when they hit.', fields: [
@@ -1806,6 +1768,7 @@
   function applyLook() {
     const root = document.documentElement.style;
     root.setProperty('--blur', cfg.look.blur + 'px');
+    root.setProperty('--ow', cfg.look.outlineW + 'px');
     if (cfg.look.colorize) root.setProperty('--tint', COLORIZE); else root.removeProperty('--tint');
     if (cfg.look.outline) root.setProperty('--otint', COLORIZE); else root.removeProperty('--otint');
     document.documentElement.classList.toggle('follow', !!cfg.look.follow);
@@ -1821,7 +1784,7 @@
   }
   document.querySelectorAll('#cols button').forEach(b => b.onclick = () => { cfg.layout.cols = +b.dataset.v; save(); applyLayout(); });
 
-  function applyAll() { applyHover(); renderMerge(); decideV1.render(); applyDepthVersion(); renderOptimize(); renderScaleUpV2(); applyVersions(); applyLook(); applyLayout(); }
+  function applyAll() { applyHover(); renderMerge(); decideV1.render(); renderOptimize(); renderScaleUpV2(); applyVersions(); applyLook(); applyLayout(); }
 
   // one control row: a slider or a checkbox, bound to obj[f.k]
   function fieldRow(f, obj, id) {
